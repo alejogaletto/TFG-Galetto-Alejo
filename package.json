@@ -53,7 +53,7 @@
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
     "next-themes": "latest",
-    "react": "^19",
+    "react": "18.2.0",
     "react-beautiful-dnd": "latest",
     "react-day-picker": "latest",
     "react-dom": "^19",
@@ -71,7 +71,7 @@
   },
   "devDependencies": {
     "@types/node": "^22",
-    "@types/react": "^19",
+    "@types/react": "18.0.38",
     "@types/react-dom": "^19",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
