@@ -39,7 +39,7 @@ const solutionForms = [
     status: "activo",
     category: "ventas",
     fields: 8,
-    submissions: 245,
+    submissions: 246,
     conversionRate: 15.2,
     createdAt: "2024-01-10",
     lastModified: "2024-01-25",
