@@ -1,6 +1,6 @@
-# AutomateSMB - Plataforma Low-Code
+# AutomateSMB - Sistema No-Code para la Creación de Aplicaciones Empresariales
 
-Una plataforma low-code moderna para crear soluciones empresariales sin necesidad de programación avanzada. Construida con Next.js, Supabase y Tailwind CSS.
+Una plataforma no-code moderna para crear soluciones empresariales sin necesidad de programación avanzada. Construida con Next.js, Supabase y Tailwind CSS.
 
 ## 🚀 Características
 
