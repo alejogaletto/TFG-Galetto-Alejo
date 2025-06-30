@@ -13,7 +13,7 @@ const forms = [
     id: "customer-feedback",
     title: "Customer Feedback",
     description: "Collect feedback from customers about their experience",
-    submissions: 146,
+    submissions: 145,
     lastSubmission: "2 hours ago",
     status: "active",
     color: "#4f46e5",
