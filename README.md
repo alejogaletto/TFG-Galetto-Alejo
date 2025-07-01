@@ -1,6 +1,6 @@
-# AutomateSMB - Sistema No-Code para la Creación de Aplicaciones Empresariales
+# AutomateSMB - Plataforma Low-Code
 
-Una plataforma no-code moderna para crear soluciones empresariales sin necesidad de programación avanzada. Construida con Next.js, Supabase y Tailwind CSS.
+Una plataforma low-code moderna para crear soluciones empresariales sin necesidad de programación avanzada. Construida con Next.js, Supabase y Tailwind CSS.
 
 ## 🚀 Características
 
@@ -24,23 +24,23 @@ Antes de comenzar, asegúrate de tener instalado:
 
 ### 1. Clonar el repositorio
 
-\`\`\`bash
+```bash
 git clone https://github.com/alejogaletto/TFG-Galetto-Alejo.git
-\`\`\`
+```
 
 ### 2. Instalar dependencias
 
-\`\`\`bash
+```bash
 npm install
 # o
 yarn install
-\`\`\`
+```
 
 ### 3. Configurar variables de entorno
 
 Crea un archivo `.env.local` en la raíz del proyecto:
 
-\`\`\`env
+```env
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=tu_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_supabase_anon_key
@@ -58,7 +58,7 @@ POSTGRES_HOST=tu_postgres_host
 # JWT
 SUPABASE_JWT_SECRET=tu_jwt_secret
 SUPABASE_ANON_KEY=tu_anon_key
-\`\`\`
+```
 
 ### 4. Configurar Supabase
 
@@ -70,7 +70,7 @@ SUPABASE_ANON_KEY=tu_anon_key
 
 #### Opción B: Supabase Local
 
-\`\`\`bash
+```bash
 # Instalar Supabase CLI
 npm install -g @supabase/cli
 
@@ -79,26 +79,26 @@ supabase init
 
 # Iniciar servicios locales
 supabase start
-\`\`\`
+```
 
 ### 5. Configurar la base de datos
 
 Ejecuta las migraciones de la base de datos:
 
-\`\`\`bash
+```bash
 # Si usas Supabase
 supabase db reset
 
 # O ejecuta los scripts SQL manualmente en tu base de datos
-\`\`\`
+```
 
 ### 6. Ejecutar el proyecto
 
-\`\`\`bash
+```bash
 npm run dev
 # o
 yarn dev
-\`\`\`
+```
 
 El proyecto estará disponible en [http://localhost:3000](http://localhost:3000)
 
@@ -109,3 +109,4 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ---
 
 **Desarrollado con ❤️ para automatizar procesos empresariales**
+```
