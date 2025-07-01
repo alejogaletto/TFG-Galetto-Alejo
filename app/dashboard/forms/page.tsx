@@ -54,7 +54,7 @@ export default function FormsPage() {
     {
       id: 1,
       name: "Retroalimentación del Cliente",
-      submissions: 45,
+      submissions: 49,
       created: "hace 2 días",
       status: "active",
       connections: ["database", "email"],
