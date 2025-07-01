@@ -17,6 +17,7 @@ import {
   Settings,
   Trash,
 } from "lucide-react"
+import { email } from "some-email-module" // Declare the email variable here
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -426,7 +427,7 @@ export default function WorkflowBuilderPage() {
                   })
                 }
               />
-              <p className="text-xs text-muted-foreground">Use field placeholders like {"{{email}}"}</p>
+              <p className="text-xs text-muted-foreground">Use field placeholders like {email}</p>
             </div>
             <div className="space-y-2">
               <Label>Subject</Label>
@@ -451,9 +452,7 @@ export default function WorkflowBuilderPage() {
                   })
                 }
               />
-              <p className="text-xs text-muted-foreground">
-                Use field placeholders like {"{{name}}"} and {"{{email}}"}
-              </p>
+              <p className="text-xs text-muted-foreground">Use field placeholders like {email}</p>
             </div>
           </>
         )}
@@ -558,7 +557,7 @@ export default function WorkflowBuilderPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full mt-2 bg-transparent"
+                  className="w-full mt-2"
                   onClick={() => {
                     const newMappings = [...(step.config.mappings || []), { source: "", target: "" }]
                     updateWorkflowStep(step.id, {
@@ -681,7 +680,7 @@ export default function WorkflowBuilderPage() {
                   key={trigger.id}
                   variant="outline"
                   size="sm"
-                  className="justify-start bg-transparent"
+                  className="justify-start"
                   onClick={() => {
                     setSelectedStepType("trigger")
                     setSelectedTriggerType(trigger.id)
@@ -734,7 +733,7 @@ export default function WorkflowBuilderPage() {
                   key={action.id}
                   variant="outline"
                   size="sm"
-                  className="justify-start bg-transparent"
+                  className="justify-start"
                   onClick={() => {
                     setSelectedStepType("action")
                     setSelectedActionType(action.id)
