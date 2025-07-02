@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -47,55 +47,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Form as FormType } from "@/lib/types"
 
 export default function FormsPage() {
   const router = useRouter()
-  const [forms, setForms] = useState([
-    {
-      id: 1,
-      name: "Retroalimentación del Cliente",
-      submissions: 49,
-      created: "hace 2 días",
-      status: "active",
-      connections: ["database", "email"],
-      databaseName: "Clientes",
-    },
-    {
-      id: 2,
-      name: "Incorporación de Empleados",
-      submissions: 12,
-      created: "hace 5 días",
-      status: "active",
-      connections: ["database", "workflow"],
-      databaseName: "Empleados",
-    },
-    {
-      id: 3,
-      name: "Solicitud de Proyecto",
-      submissions: 28,
-      created: "hace 1 semana",
-      status: "active",
-      connections: ["database"],
-      databaseName: "Proyectos",
-    },
-    {
-      id: 4,
-      name: "Ticket de Soporte IT",
-      submissions: 67,
-      created: "hace 2 semanas",
-      status: "active",
-      connections: ["database", "email", "workflow"],
-      databaseName: "Soporte",
-    },
-    {
-      id: 5,
-      name: "Registro de Evento",
-      submissions: 0,
-      created: "hace 3 semanas",
-      status: "draft",
-      connections: [],
-    },
-  ])
+  const [forms, setForms] = useState<FormType[]>([])
+
+  useEffect(() => {
+    const fetchForms = async () => {
+      try {
+        const response = await fetch('/api/forms');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setForms(data);
+      } catch (error) {
+        console.error("Error fetching forms:", error);
+      }
+    };
+    fetchForms();
+  }, []);
 
   const [showNewForm, setShowNewForm] = useState(false)
   const [newForm, setNewForm] = useState({
@@ -119,37 +91,29 @@ export default function FormsPage() {
     { id: "support", name: "Ticket de Soporte", description: "Maneja solicitudes de soporte" },
   ]
 
-  const addNewForm = () => {
+  const addNewForm = async () => {
     try {
-      const newId = forms.length > 0 ? Math.max(...forms.map((form) => form.id)) + 1 : 1
-      const newFormData = {
-        id: newId,
-        name: newForm.name || "Untitled Form",
-        description: newForm.description || "",
-        submissions: 0,
-        created: "Ahora mismo",
-        status: "draft",
-        connections: newForm.database ? ["database"] : [],
-        template: newForm.template || "blank",
-        enableNotifications: newForm.enableNotifications,
-        enableWorkflow: newForm.enableWorkflow,
-        enableCaptcha: newForm.enableCaptcha,
-        googleSheets: newForm.googleSheets,
-        googleDocs: newForm.googleDocs,
-        databaseName: newForm.database ? newForm.database.charAt(0).toUpperCase() + newForm.database.slice(1) : null,
+      const response = await fetch('/api/forms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newForm.name || "Untitled Form",
+          description: newForm.description || "",
+          configs: { template: newForm.template, enableNotifications: newForm.enableNotifications, enableWorkflow: newForm.enableWorkflow, enableCaptcha: newForm.enableCaptcha, googleSheets: newForm.googleSheets, googleDocs: newForm.googleDocs, database: newForm.database },
+          is_active: newForm.template !== "draft", // Assuming draft forms are not active
+          user_id: 1, // TODO: Replace with actual user ID from session
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Add email connection if notifications are enabled
-      if (newForm.enableNotifications) {
-        newFormData.connections.push("email")
-      }
+      const createdForm = await response.json();
+      setForms((prevForms) => [...prevForms, createdForm[0]]);
 
-      // Add workflow connection if workflows are enabled
-      if (newForm.enableWorkflow) {
-        newFormData.connections.push("workflow")
-      }
-
-      setForms([...forms, newFormData])
       setNewForm({
         name: "",
         description: "",
@@ -160,17 +124,32 @@ export default function FormsPage() {
         enableCaptcha: true,
         googleSheets: false,
         googleDocs: false,
-      })
-      setShowNewForm(false)
+      });
+      setShowNewForm(false);
 
-      // Use router.push instead of direct window.location manipulation
-      router.push(`/dashboard/form-builder/${newId}`)
+      router.push(`/dashboard/form-builder/${createdForm[0].id}`);
     } catch (error) {
-      console.error("Error creating form:", error)
+      console.error("Error creating form:", error);
       // Fallback to a simpler navigation if the router fails
-      window.location.href = `/dashboard/form-builder/new?template=${newForm.template || "blank"}`
+      window.location.href = `/dashboard/form-builder/new?template=${newForm.template || "blank"}`;
     }
-  }
+  };
+
+  const deleteForm = async (id: number) => {
+    try {
+      const response = await fetch(`/api/forms/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      setForms((prevForms) => prevForms.filter((form) => form.id !== id));
+    } catch (error) {
+      console.error("Error deleting form:", error);
+    }
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -636,7 +615,7 @@ export default function FormsPage() {
                     <CardHeader className="flex flex-row items-start justify-between space-y-0">
                       <div>
                         <CardTitle>{form.name}</CardTitle>
-                        <CardDescription>Creado {form.created}</CardDescription>
+                        <CardDescription>Creado {new Date(form.creation_date!).toLocaleDateString()}</CardDescription>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -649,10 +628,6 @@ export default function FormsPage() {
                           <DropdownMenuItem>
                             <Link
                               href={`/dashboard/form-builder/${form.id}`}
-                              onClick={(e) => {
-                                e.preventDefault()
-                                router.push(`/dashboard/form-builder/${form.id}`)
-                              }}
                             >
                               <Edit className="mr-2 h-4 w-4" />
                               Editar
@@ -663,7 +638,7 @@ export default function FormsPage() {
                             Duplicar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem className="text-destructive" onClick={() => deleteForm(form.id)}>
                             <Trash className="mr-2 h-4 w-4" />
                             Eliminar
                           </DropdownMenuItem>
@@ -673,43 +648,26 @@ export default function FormsPage() {
                     <CardContent className="flex-1">
                       <div className="flex items-center gap-4">
                         <div className="flex-1">
-                          <div className="text-sm font-medium">Envíos</div>
-                          <div className="text-2xl font-bold">{form.submissions}</div>
+                          <div className="text-sm font-medium">Estado</div>
+                          <div className="text-2xl font-bold">{form.is_active ? "Activo" : "Borrador"}</div>
                         </div>
                         <div className="flex h-8 items-center">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              form.status === "active" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                              form.is_active ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
                             }`}
                           >
-                            {form.status === "active" ? "Activo" : "Borrador"}
+                            {form.is_active ? "Activo" : "Borrador"}
                           </span>
                         </div>
                       </div>
 
-                      {form.connections.length > 0 && (
+                      {form.configs && form.configs.database && (
                         <div className="mt-3 flex flex-wrap gap-1">
-                          {form.connections.includes("database") && (
-                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-50">
-                              <Database className="h-3 w-3 mr-1" />
-                              {form.databaseName || "Base de Datos"}
-                            </Badge>
-                          )}
-                          {form.connections.includes("email") && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs bg-purple-50 text-purple-700 hover:bg-purple-50"
-                            >
-                              <Mail className="h-3 w-3 mr-1" />
-                              Email
-                            </Badge>
-                          )}
-                          {form.connections.includes("workflow") && (
-                            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 hover:bg-amber-50">
-                              <GitBranch className="h-3 w-3 mr-1" />
-                              Flujo de Trabajo
-                            </Badge>
-                          )}
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-50">
+                            <Database className="h-3 w-3 mr-1" />
+                            {form.configs.database}
+                          </Badge>
                         </div>
                       )}
                     </CardContent>
