@@ -26,21 +26,44 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      // Simulate signup process
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // For demo purposes, simulate successful signup
-      toast({
-        title: "¡Cuenta creada!",
-        description: "Tu cuenta ha sido creada exitosamente.",
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, configs: { companyName } }),
       })
 
-      // Redirect to dashboard
-      router.push("/dashboard")
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || "No se pudo crear la cuenta")
+      }
+
+      // Auto-login right after successful sign up
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (loginRes.ok) {
+        const { user } = await loginRes.json()
+        localStorage.setItem("user", JSON.stringify(user))
+        toast({
+          title: "¡Cuenta creada!",
+          description: "Sesión iniciada correctamente.",
+        })
+        router.push("/dashboard")
+      } else {
+        // Fallback: if auto-login fails, go to login page
+        toast({
+          title: "Cuenta creada",
+          description: "Inicia sesión para continuar.",
+        })
+        router.push("/login")
+      }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Algo salió mal. Por favor intenta de nuevo.",
+        description: error?.message || "Algo salió mal. Por favor intenta de nuevo.",
         variant: "destructive",
       })
     } finally {

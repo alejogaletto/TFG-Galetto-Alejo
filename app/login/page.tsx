@@ -43,43 +43,27 @@ export default function LoginPage() {
         return
       }
 
-      // Simulación de login (reemplazar con Supabase cuando esté configurado)
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
 
-      // Credenciales de demo para testing
-      const validCredentials = [
-        { email: "admin@ejemplo.com", password: "admin123" },
-        { email: "usuario@ejemplo.com", password: "usuario123" },
-        { email: email, password: password }, // Acepta cualquier credencial por ahora
-      ]
-
-      const isValidUser =
-        validCredentials.some((cred) => cred.email === email && cred.password === password) || password.length >= 6 // Acepta cualquier password de 6+ caracteres
-
-      if (isValidUser) {
-        toast({
-          title: "¡Bienvenido!",
-          description: "Has iniciado sesión correctamente",
-        })
-
-        // Simular almacenamiento de sesión
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            email,
-            name: email.split("@")[0],
-            id: Math.random().toString(36).substr(2, 9),
-          }),
-        )
-
-        router.push("/dashboard")
-      } else {
-        toast({
-          title: "Error de autenticación",
-          description: "Email o contraseña incorrectos",
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body?.error || "Email o contraseña incorrectos")
       }
+
+      const { user } = await response.json()
+
+      toast({
+        title: "¡Bienvenido!",
+        description: "Has iniciado sesión correctamente",
+      })
+
+      localStorage.setItem("user", JSON.stringify(user))
+
+      router.push("/dashboard")
     } catch (error) {
       toast({
         title: "Error",
