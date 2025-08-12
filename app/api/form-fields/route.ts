@@ -14,8 +14,16 @@ export async function POST(req: NextRequest) {
 }
 
 // Get all form fields
-export async function GET() {
-  const { data, error } = await supabase.from('FormField').select('*');
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const formId = searchParams.get('form_id')
+
+  let query = supabase.from('FormField').select('*')
+  if (formId) {
+    query = query.eq('form_id', Number(formId))
+  }
+
+  const { data, error } = await query.order('position', { ascending: true })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }
