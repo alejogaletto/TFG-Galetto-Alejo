@@ -109,3 +109,63 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ---
 
 **Desarrollado con ❤️ para automatizar procesos empresariales**
+
+### API (resumen rápido)
+
+Endpoints principales agrupados por dominio. Todos responden JSON. Los `POST` y `PUT` aceptan `Content-Type: application/json`.
+
+- Usuarios
+  - POST `/api/users` (crear)
+  - GET `/api/users` (listar)
+  - GET `/api/users/:id` (detalle)
+  - PUT `/api/users/:id` (actualizar; si incluye `password`, se hashea)
+  - DELETE `/api/users/:id` (eliminar)
+  - POST `/api/auth/login` (login; valida contra tabla `User` con bcrypt)
+
+- Formularios y campos
+  - POST `/api/forms`, GET `/api/forms`, GET/PUT/DELETE `/api/forms/:id`
+  - POST `/api/form-fields`, GET `/api/form-fields`
+    - Filtro por formulario: `/api/form-fields?form_id={id}` (ordenado por `position`)
+  - GET/PUT/DELETE `/api/form-fields/:id`
+
+- Esquemas virtuales (simulan “bases de datos” del usuario)
+  - VirtualSchema: POST/GET `/api/virtual-schemas`, GET/PUT/DELETE `/api/virtual-schemas/:id`
+    - Árbol completo por usuario: `/api/virtual-schemas?user_id={id}&includeTree=true`
+    - Árbol de un esquema: `/api/virtual-schemas/:id/tree`
+      - Modo liviano: `?lightweight=true` (devuelve solo `id`/`name`)
+  - VirtualTableSchema: POST/GET `/api/virtual-table-schemas`, GET/PUT/DELETE `/api/virtual-table-schemas/:id`
+  - VirtualFieldSchema: POST/GET `/api/virtual-field-schemas`, GET/PUT/DELETE `/api/virtual-field-schemas/:id`
+
+- Conexiones y mapeos
+  - DataConnection: POST/GET `/api/data-connections`, GET/PUT/DELETE `/api/data-connections/:id`
+  - FieldMapping: POST/GET `/api/field-mappings`, GET/PUT/DELETE `/api/field-mappings/:id`
+
+Notas de integridad referencial
+- Las FKs tienen `ON DELETE CASCADE`, por lo que al eliminar un `VirtualSchema` se eliminan sus tablas y campos, y al eliminar un `Form` se eliminan sus `FormField` y `DataConnection` (y sus `FieldMapping`).
+
+Ejemplos rápidos
+
+```bash
+# Crear usuario
+curl -s -X POST http://localhost:3000/api/users \
+  -H 'Content-Type: application/json' \
+  --data '{"name":"John","email":"john@example.com","password":"12345678","configs":{"companyName":"ACME"}}'
+
+# Listar formularios
+curl -s http://localhost:3000/api/forms
+
+# Campos de un formulario
+curl -s "http://localhost:3000/api/form-fields?form_id=1"
+
+# Árbol de un esquema virtual
+curl -s http://localhost:3000/api/virtual-schemas/1/tree
+
+# Árbol liviano (solo ids/nombres)
+curl -s "http://localhost:3000/api/virtual-schemas/1/tree?lightweight=true"
+```
+
+### ¿Mejor que README para documentar?
+
+
+
+Si quieres, puedo añadir una página `/api-docs` con Swagger UI y un `openapi.yaml` inicial para estos endpoints.

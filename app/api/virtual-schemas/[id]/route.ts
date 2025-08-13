@@ -26,7 +26,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 // Delete a virtual schema by ID
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
-  const { data, error } = await supabase.from('VirtualSchema').delete().eq('id', id);
+  // With ON DELETE CASCADE, deleting the schema will remove tables and fields
+  const { error } = await supabase.from('VirtualSchema').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });
 }
