@@ -163,9 +163,3 @@ curl -s http://localhost:3000/api/virtual-schemas/1/tree
 # Árbol liviano (solo ids/nombres)
 curl -s "http://localhost:3000/api/virtual-schemas/1/tree?lightweight=true"
 ```
-
-### ¿Mejor que README para documentar?
-
-
-
-Si quieres, puedo añadir una página `/api-docs` con Swagger UI y un `openapi.yaml` inicial para estos endpoints.
