@@ -140,6 +140,20 @@ Endpoints principales agrupados por dominio. Todos responden JSON. Los `POST` y 
   - DataConnection: POST/GET `/api/data-connections`, GET/PUT/DELETE `/api/data-connections/:id`
   - FieldMapping: POST/GET `/api/field-mappings`, GET/PUT/DELETE `/api/field-mappings/:id`
 
+- Datos empresariales (BusinessData)
+  - BusinessData: POST/GET `/api/business-data`, GET/PUT/DELETE `/api/business-data/:id`
+    - Almacena datos del usuario según sus esquemas virtuales
+    - Actualización automática de `modification_date`
+    - Datos flexibles en formato JSON según la estructura de `VirtualTableSchema`
+
+- Flujos de trabajo (Workflows)
+  - Workflow: POST/GET `/api/workflows`, GET/PUT/DELETE `/api/workflows/:id`
+    - Con pasos anidados: `/api/workflows?includeSteps=true` (todos los workflows)
+    - Con pasos anidados: `/api/workflows/:id?includeSteps=true` (workflow específico)
+    - Árbol completo: `/api/workflows/:id/tree`
+      - Modo liviano: `?lightweight=true` (devuelve solo `id`, `type`, `position`)
+  - WorkflowStep: POST/GET `/api/workflow-steps`, GET/PUT/DELETE `/api/workflow-steps/:id`
+
 Notas de integridad referencial
 - Las FKs tienen `ON DELETE CASCADE`, por lo que al eliminar un `VirtualSchema` se eliminan sus tablas y campos, y al eliminar un `Form` se eliminan sus `FormField` y `DataConnection` (y sus `FieldMapping`).
 
@@ -162,5 +176,41 @@ curl -s http://localhost:3000/api/virtual-schemas/1/tree
 
 # Árbol liviano (solo ids/nombres)
 curl -s "http://localhost:3000/api/virtual-schemas/1/tree?lightweight=true"
+
+# Crear workflow
+curl -s -X POST http://localhost:3000/api/workflows \
+  -H 'Content-Type: application/json' \
+  --data '{"user_id":1,"name":"Mi Workflow","description":"Workflow de prueba","configs":{"type":"automation"},"is_active":true}'
+
+# Workflow con pasos anidados
+curl -s "http://localhost:3000/api/workflows/1?includeSteps=true"
+
+# Árbol completo de workflow
+curl -s http://localhost:3000/api/workflows/1/tree
+
+# Modo liviano del workflow
+curl -s "http://localhost:3000/api/workflows/1/tree?lightweight=true"
+
+# Crear conexión de datos
+curl -s -X POST http://localhost:3000/api/data-connections \
+  -H 'Content-Type: application/json' \
+  --data '{"form_id":1,"virtual_table_schema_id":1}'
+
+# Listar conexiones de datos
+curl -s http://localhost:3000/api/data-connections
+
+# Obtener conexión específica
+curl -s http://localhost:3000/api/data-connections/1
+
+# Crear datos empresariales
+curl -s -X POST http://localhost:3000/api/business-data \
+  -H 'Content-Type: application/json' \
+  --data '{"user_id":1,"virtual_table_schema_id":1,"data_json":{"name":"John Doe","email":"john@example.com","phone":"+1234567890","company":"ACME Corp","status":"active"}}'
+
+# Listar datos empresariales
+curl -s http://localhost:3000/api/business-data
+
+# Obtener datos específicos
+curl -s http://localhost:3000/api/business-data/1
 ```
 
