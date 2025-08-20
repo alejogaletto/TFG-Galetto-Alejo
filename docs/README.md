@@ -157,13 +157,13 @@ Si encuentras problemas o tienes preguntas:
 
 Esta documentación se actualiza regularmente para reflejar:
 - Nuevas funcionalidades implementadas
-- **Constructor de Base de Datos** (Agregado en Diciembre 2024)
+- **Constructor de Base de Datos** (Agregado en Agosto 2025)
 - Cambios en la API
 - Mejoras en el esquema de base de datos
 - Soluciones a problemas comunes
 
 ---
 
-**Última actualización**: Diciembre 2024  
+**Última actualización**: Agosto 2025  
 **Versión del proyecto**: 1.0.0  
 **Autor**: Alejo Galetto
