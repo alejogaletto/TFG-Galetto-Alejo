@@ -77,6 +77,15 @@ CREATE TABLE "BusinessData" (
   "modification_date" TIMESTAMP
 );
 
+CREATE TABLE "FormSubmission" (
+  "id" SERIAL PRIMARY KEY,
+  "form_id" INTEGER REFERENCES "Form"("id") ON DELETE CASCADE,
+  "submission_data" JSONB NOT NULL,
+  "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "ip_address" VARCHAR(45),
+  "user_agent" TEXT
+);
+
 CREATE TABLE "Workflow" (
   "id" SERIAL PRIMARY KEY,
   "user_id" INTEGER REFERENCES "User"("id"),

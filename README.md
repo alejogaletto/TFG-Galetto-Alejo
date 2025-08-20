@@ -1,216 +1,156 @@
-# AutomateSMB - Sistema No-Code para la Creación de Aplicaciones Empresariales
+# TFG-Galetto-Alejo
 
-Una plataforma no-code moderna para crear soluciones empresariales sin necesidad de programación avanzada. Construida con Next.js, Supabase y Tailwind CSS.
+## Descripción
 
-## 🚀 Características
+Este proyecto es una aplicación web desarrollada como trabajo final de grado (TFG) que permite a los usuarios crear formularios dinámicos, gestionar bases de datos virtuales y automatizar flujos de trabajo.
 
-- **Constructor de Formularios**: Crea formularios dinámicos con drag & drop
-- **Constructor de Flujos de Trabajo**: Automatiza procesos empresariales
-- **Gestión de Bases de Datos**: Administra datos de forma visual
-- **Plantillas de Soluciones**: CRM, Inventario, Analytics y más
-- **Integraciones**: Conecta con servicios externos
-- **Dashboard Analytics**: Visualiza métricas y estadísticas
+## 🚀 Características Principales
 
-## 📋 Requisitos Previos
+- **Sistema de Formularios Dinámicos**: Creación y gestión de formularios con campos personalizables
+- **Esquemas Virtuales de Base de Datos**: Simulación de creación de bases de datos por usuarios
+- **Flujos de Trabajo Automatizados**: Definición y ejecución de flujos de trabajo
+- **Almacenamiento Inteligente**: Sistema que decide automáticamente dónde almacenar los datos
+- **Autenticación Segura**: Sistema de usuarios con contraseñas hasheadas
 
-Antes de comenzar, asegúrate de tener instalado:
+## 🛠️ Tecnologías Utilizadas
 
-- **Node.js** (versión 18 o superior)
-- **npm** o **yarn**
-- **Git**
-- Una cuenta en **Supabase** (para la base de datos)
+- **Frontend**: Next.js 14, React, TypeScript
+- **Backend**: Next.js API Routes
+- **Base de Datos**: PostgreSQL (Supabase)
+- **Autenticación**: Supabase Auth
+- **Estilos**: Tailwind CSS
+- **Despliegue**: Vercel
 
-## 🛠️ Instalación
+## 📖 Instalación Rápida
 
-### 1. Clonar el repositorio
+### Requisitos Previos
+- Node.js 18 o superior
+- npm o pnpm
+- Cuenta de Supabase
 
+### Pasos Básicos
 ```bash
-git clone https://github.com/alejogaletto/TFG-Galetto-Alejo.git
-```
+# 1. Clonar repositorio
+git clone <url-del-repositorio>
+cd TFG-Galetto-Alejo
 
-### 2. Instalar dependencias
+# 2. Instalar dependencias
+npm install --legacy-peer-deps
 
-```bash
-npm install
-# o
-yarn install
-```
-
-### 3. Configurar variables de entorno
-
-Crea un archivo `.env.local` en la raíz del proyecto:
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=tu_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=tu_supabase_service_role_key
-
-# Base de datos (si usas PostgreSQL directo)
-POSTGRES_URL=tu_postgres_url
-POSTGRES_PRISMA_URL=tu_postgres_prisma_url
-POSTGRES_URL_NON_POOLING=tu_postgres_url_non_pooling
-POSTGRES_USER=tu_postgres_user
-POSTGRES_PASSWORD=tu_postgres_password
-POSTGRES_DATABASE=tu_postgres_database
-POSTGRES_HOST=tu_postgres_host
-
-# JWT
-SUPABASE_JWT_SECRET=tu_jwt_secret
-SUPABASE_ANON_KEY=tu_anon_key
-```
-
-### 4. Configurar Supabase
-
-#### Opción A: Usar Supabase Cloud
-
-1. Ve a [supabase.com](https://supabase.com)
-2. Crea un nuevo proyecto
-3. Copia las credenciales al archivo `.env.local`
-
-#### Opción B: Supabase Local
-
-```bash
-# Instalar Supabase CLI
-npm install -g @supabase/cli
-
-# Inicializar Supabase
-supabase init
-
-# Iniciar servicios locales
-supabase start
-```
-
-### 5. Configurar la base de datos
-
-Ejecuta las migraciones de la base de datos:
-
-```bash
-# Si usas Supabase
-supabase db reset
-
-# O ejecuta los scripts SQL manualmente en tu base de datos
-```
-
-### 6. Ejecutar el proyecto
-
-```bash
+# 3. Configurar .env.local
+# 4. Aplicar esquema de BD en Supabase
+# 5. Ejecutar proyecto
 npm run dev
-# o
-yarn dev
 ```
 
-El proyecto estará disponible en [http://localhost:3000](http://localhost:3000)
+## 🔌 API - Endpoints Principales
 
-## 📝 Licencia
+| Modelo | Endpoint | Operaciones |
+|--------|----------|-------------|
+| **Usuarios** | `/api/users` | CRUD completo |
+| **Formularios** | `/api/forms` | CRUD completo |
+| **Esquemas** | `/api/virtual-schemas` | CRUD + árbol anidado |
+| **Flujos** | `/api/workflows` | CRUD + pasos anidados |
+| **Envíos** | `/api/form-submissions` | Sistema inteligente |
+
+## 📚 Documentación Completa
+
+Para información detallada, consulta la carpeta [`docs/`](./docs/):
+
+- **[🚀 Configuración y Despliegue](./docs/setup-deployment.md)** - Setup completo y despliegue
+- **[🗄️ Esquema de Base de Datos](./docs/database-schema.md)** - Estructura de tablas y relaciones
+- **[🔌 API Endpoints](./docs/api-endpoints.md)** - Documentación completa de APIs
+- **[📝 Sistema de Formularios](./docs/form-submissions.md)** - Explicación del sistema inteligente
+
+## 🎯 Funcionalidades Clave
+
+### Sistema de Formularios
+- Campos dinámicos con validaciones configurables
+- Renderizado automático basado en esquemas
+- Almacenamiento inteligente (BD empresarial o genérico)
+
+### Esquemas Virtuales
+- Creación de "bases de datos" simuladas
+- Estructura jerárquica: Esquema → Tablas → Campos
+- Configuraciones flexibles en JSONB
+
+### Flujos de Trabajo
+- Definición de flujos con pasos configurables
+- Tipos: email, webhook, condición, delay
+- Ejecución secuencial con posicionamiento
+
+## 🏗️ Estructura del Proyecto
+
+```
+TFG-Galetto-Alejo/
+├── app/                    # Next.js App Router
+│   ├── api/               # API Routes
+│   ├── dashboard/         # Panel de administración
+│   ├── forms/            # Formularios públicos
+│   └── auth/             # Autenticación
+├── components/            # Componentes reutilizables
+├── lib/                  # Utilidades y configuraciones
+├── supabase/             # Esquema de base de datos
+└── docs/                 # 📚 Documentación completa
+```
+
+## 🚀 Uso Rápido
+
+### 1. Crear Formulario
+- Dashboard → Formularios → Nuevo Formulario
+- Configurar campos y validaciones
+- Guardar formulario
+
+### 2. Conectar a Base de Datos
+- Database Builder → Crear Esquema
+- Definir tablas y campos
+- Conectar formulario al esquema
+- Mapear campos
+
+### 3. Crear Flujo de Trabajo
+- Workflows → Nuevo Workflow
+- Definir pasos y configuraciones
+- Configurar posiciones de ejecución
+
+## 🔍 Ejemplos de Uso
+
+### Crear Usuario
+```bash
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Juan","email":"juan@test.com","password":"123456"}'
+```
+
+### Obtener Esquema con Árbol
+```bash
+curl "http://localhost:3000/api/virtual-schemas/1?includeTree=true"
+```
+
+## 📞 Soporte
+
+- **Documentación**: Revisar carpeta [`docs/`](./docs/)
+- **Issues**: Crear issue en GitHub para problemas
+- **Logs**: Verificar consola y logs del servidor
+
+## 🤝 Contribución
+
+1. Fork el proyecto
+2. Crear rama para feature (`git checkout -b feature/NuevaFuncionalidad`)
+3. Commit cambios (`git commit -m 'Add NuevaFuncionalidad'`)
+4. Push a la rama (`git push origin feature/NuevaFuncionalidad`)
+5. Abrir Pull Request
+
+## 📄 Licencia
 
 Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
 
+## 👨‍💻 Contacto
+
+**Alejo Galetto** - [@alejogaletto](https://github.com/alejogaletto)
+
+**Link del proyecto**: [https://github.com/alejogaletto/TFG-Galetto-Alejo](https://github.com/alejogaletto/TFG-Galetto-Alejo)
+
 ---
 
-**Desarrollado con ❤️ para automatizar procesos empresariales**
-
-### API (resumen rápido)
-
-Endpoints principales agrupados por dominio. Todos responden JSON. Los `POST` y `PUT` aceptan `Content-Type: application/json`.
-
-- Usuarios
-  - POST `/api/users` (crear)
-  - GET `/api/users` (listar)
-  - GET `/api/users/:id` (detalle)
-  - PUT `/api/users/:id` (actualizar; si incluye `password`, se hashea)
-  - DELETE `/api/users/:id` (eliminar)
-  - POST `/api/auth/login` (login; valida contra tabla `User` con bcrypt)
-
-- Formularios y campos
-  - POST `/api/forms`, GET `/api/forms`, GET/PUT/DELETE `/api/forms/:id`
-  - POST `/api/form-fields`, GET `/api/form-fields`
-    - Filtro por formulario: `/api/form-fields?form_id={id}` (ordenado por `position`)
-  - GET/PUT/DELETE `/api/form-fields/:id`
-
-- Esquemas virtuales (simulan “bases de datos” del usuario)
-  - VirtualSchema: POST/GET `/api/virtual-schemas`, GET/PUT/DELETE `/api/virtual-schemas/:id`
-    - Árbol completo por usuario: `/api/virtual-schemas?user_id={id}&includeTree=true`
-    - Árbol de un esquema: `/api/virtual-schemas/:id/tree`
-      - Modo liviano: `?lightweight=true` (devuelve solo `id`/`name`)
-  - VirtualTableSchema: POST/GET `/api/virtual-table-schemas`, GET/PUT/DELETE `/api/virtual-table-schemas/:id`
-  - VirtualFieldSchema: POST/GET `/api/virtual-field-schemas`, GET/PUT/DELETE `/api/virtual-field-schemas/:id`
-
-- Conexiones y mapeos
-  - DataConnection: POST/GET `/api/data-connections`, GET/PUT/DELETE `/api/data-connections/:id`
-  - FieldMapping: POST/GET `/api/field-mappings`, GET/PUT/DELETE `/api/field-mappings/:id`
-
-- Datos empresariales (BusinessData)
-  - BusinessData: POST/GET `/api/business-data`, GET/PUT/DELETE `/api/business-data/:id`
-    - Almacena datos del usuario según sus esquemas virtuales
-    - Actualización automática de `modification_date`
-    - Datos flexibles en formato JSON según la estructura de `VirtualTableSchema`
-
-- Flujos de trabajo (Workflows)
-  - Workflow: POST/GET `/api/workflows`, GET/PUT/DELETE `/api/workflows/:id`
-    - Con pasos anidados: `/api/workflows?includeSteps=true` (todos los workflows)
-    - Con pasos anidados: `/api/workflows/:id?includeSteps=true` (workflow específico)
-    - Árbol completo: `/api/workflows/:id/tree`
-      - Modo liviano: `?lightweight=true` (devuelve solo `id`, `type`, `position`)
-  - WorkflowStep: POST/GET `/api/workflow-steps`, GET/PUT/DELETE `/api/workflow-steps/:id`
-
-Notas de integridad referencial
-- Las FKs tienen `ON DELETE CASCADE`, por lo que al eliminar un `VirtualSchema` se eliminan sus tablas y campos, y al eliminar un `Form` se eliminan sus `FormField` y `DataConnection` (y sus `FieldMapping`).
-
-Ejemplos rápidos
-
-```bash
-# Crear usuario
-curl -s -X POST http://localhost:3000/api/users \
-  -H 'Content-Type: application/json' \
-  --data '{"name":"John","email":"john@example.com","password":"12345678","configs":{"companyName":"ACME"}}'
-
-# Listar formularios
-curl -s http://localhost:3000/api/forms
-
-# Campos de un formulario
-curl -s "http://localhost:3000/api/form-fields?form_id=1"
-
-# Árbol de un esquema virtual
-curl -s http://localhost:3000/api/virtual-schemas/1/tree
-
-# Árbol liviano (solo ids/nombres)
-curl -s "http://localhost:3000/api/virtual-schemas/1/tree?lightweight=true"
-
-# Crear workflow
-curl -s -X POST http://localhost:3000/api/workflows \
-  -H 'Content-Type: application/json' \
-  --data '{"user_id":1,"name":"Mi Workflow","description":"Workflow de prueba","configs":{"type":"automation"},"is_active":true}'
-
-# Workflow con pasos anidados
-curl -s "http://localhost:3000/api/workflows/1?includeSteps=true"
-
-# Árbol completo de workflow
-curl -s http://localhost:3000/api/workflows/1/tree
-
-# Modo liviano del workflow
-curl -s "http://localhost:3000/api/workflows/1/tree?lightweight=true"
-
-# Crear conexión de datos
-curl -s -X POST http://localhost:3000/api/data-connections \
-  -H 'Content-Type: application/json' \
-  --data '{"form_id":1,"virtual_table_schema_id":1}'
-
-# Listar conexiones de datos
-curl -s http://localhost:3000/api/data-connections
-
-# Obtener conexión específica
-curl -s http://localhost:3000/api/data-connections/1
-
-# Crear datos empresariales
-curl -s -X POST http://localhost:3000/api/business-data \
-  -H 'Content-Type: application/json' \
-  --data '{"user_id":1,"virtual_table_schema_id":1,"data_json":{"name":"John Doe","email":"john@example.com","phone":"+1234567890","company":"ACME Corp","status":"active"}}'
-
-# Listar datos empresariales
-curl -s http://localhost:3000/api/business-data
-
-# Obtener datos específicos
-curl -s http://localhost:3000/api/business-data/1
-```
+**💡 Tip**: Para información técnica detallada, consulta la carpeta [`docs/`](./docs/)
 

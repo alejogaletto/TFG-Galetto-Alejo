@@ -52,10 +52,14 @@ import { Form as FormType } from "@/lib/types"
 export default function FormsPage() {
   const router = useRouter()
   const [forms, setForms] = useState<FormType[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchForms = async () => {
       try {
+        setIsLoading(true)
+        setError(null)
         const response = await fetch('/api/forms');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -64,6 +68,9 @@ export default function FormsPage() {
         setForms(data);
       } catch (error) {
         console.error("Error fetching forms:", error);
+        setError("Error al cargar los formularios");
+      } finally {
+        setIsLoading(false)
       }
     };
     fetchForms();
@@ -92,28 +99,48 @@ export default function FormsPage() {
   ]
 
   const addNewForm = async () => {
+    if (!newForm.name.trim()) {
+      setError("El nombre del formulario es requerido");
+      return;
+    }
+
     try {
+      setIsLoading(true)
+      setError(null)
+      
       const response = await fetch('/api/forms', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: newForm.name || "Untitled Form",
-          description: newForm.description || "",
-          configs: { template: newForm.template, enableNotifications: newForm.enableNotifications, enableWorkflow: newForm.enableWorkflow, enableCaptcha: newForm.enableCaptcha, googleSheets: newForm.googleSheets, googleDocs: newForm.googleDocs, database: newForm.database },
-          is_active: newForm.template !== "draft", // Assuming draft forms are not active
+          name: newForm.name.trim(),
+          description: newForm.description.trim(),
+          configs: { 
+            template: newForm.template, 
+            enableNotifications: newForm.enableNotifications, 
+            enableWorkflow: newForm.enableWorkflow, 
+            enableCaptcha: newForm.enableCaptcha, 
+            googleSheets: newForm.googleSheets, 
+            googleDocs: newForm.googleDocs, 
+            database: newForm.database 
+          },
+          is_active: true,
           user_id: 1, // TODO: Replace with actual user ID from session
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
       }
 
       const createdForm = await response.json();
-      setForms((prevForms) => [...prevForms, createdForm[0]]);
+      
+      // Add the new form to the local state
+      setForms((prevForms: FormType[]) => [...prevForms, createdForm[0]]);
 
+      // Reset form state
       setNewForm({
         name: "",
         description: "",
@@ -125,13 +152,25 @@ export default function FormsPage() {
         googleSheets: false,
         googleDocs: false,
       });
+      
+      // Close the dialog
       setShowNewForm(false);
 
+      // Show success message (you can add a toast notification here)
+      console.log("Formulario creado exitosamente:", createdForm[0].name);
+
+      // Redirect to form builder
       router.push(`/dashboard/form-builder/${createdForm[0].id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating form:", error);
+      setError(error?.message || "Error al crear el formulario");
+      
       // Fallback to a simpler navigation if the router fails
-      window.location.href = `/dashboard/form-builder/new?template=${newForm.template || "blank"}`;
+      setTimeout(() => {
+        window.location.href = `/dashboard/form-builder/new?template=${newForm.template || "blank"}`;
+      }, 2000);
+    } finally {
+      setIsLoading(false)
     }
   };
 
@@ -145,7 +184,7 @@ export default function FormsPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      setForms((prevForms) => prevForms.filter((form) => form.id !== id));
+      setForms((prevForms: FormType[]) => prevForms.filter((form: FormType) => form.id !== id));
     } catch (error) {
       console.error("Error deleting form:", error);
     }
@@ -300,7 +339,7 @@ export default function FormsPage() {
                           id="form-name"
                           placeholder="ej. Encuesta de Cliente"
                           value={newForm.name}
-                          onChange={(e) => setNewForm({ ...newForm, name: e.target.value })}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewForm({ ...newForm, name: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
@@ -309,7 +348,7 @@ export default function FormsPage() {
                           id="form-description"
                           placeholder="Describe el propósito de este formulario"
                           value={newForm.description}
-                          onChange={(e) => setNewForm({ ...newForm, description: e.target.value })}
+                          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewForm({ ...newForm, description: e.target.value })}
                         />
                       </div>
                     </div>
@@ -321,7 +360,7 @@ export default function FormsPage() {
                         <Label htmlFor="form-template">Comenzar con una Plantilla</Label>
                         <Select
                           value={newForm.template}
-                          onValueChange={(value) => setNewForm({ ...newForm, template: value })}
+                          onValueChange={(value: string) => setNewForm({ ...newForm, template: value })}
                         >
                           <SelectTrigger id="form-template">
                             <SelectValue placeholder="Selecciona una plantilla" />
@@ -433,7 +472,7 @@ export default function FormsPage() {
                           <Select
                             defaultValue="customers"
                             value={newForm.database}
-                            onValueChange={(value) => setNewForm({ ...newForm, database: value })}
+                            onValueChange={(value: string) => setNewForm({ ...newForm, database: value })}
                             disabled={!newForm.database}
                           >
                             <SelectTrigger id="database-select">
@@ -590,8 +629,8 @@ export default function FormsPage() {
                   <Button variant="outline" onClick={() => setShowNewForm(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={addNewForm} disabled={!newForm.name}>
-                    Crear y Personalizar
+                  <Button onClick={addNewForm} disabled={isLoading || !newForm.name}>
+                    {isLoading ? "Creando..." : "Crear y Personalizar"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -610,97 +649,108 @@ export default function FormsPage() {
             </div>
             <div className="border-t">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                {forms.map((form) => (
-                  <Card key={form.id} className="flex flex-col">
-                    <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                      <div>
-                        <CardTitle>{form.name}</CardTitle>
-                        <CardDescription>Creado {new Date(form.creation_date!).toLocaleDateString()}</CardDescription>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Abrir menú</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Link
-                              href={`/dashboard/form-builder/${form.id}`}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              Editar
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Duplicar
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive" onClick={() => deleteForm(form.id)}>
-                            <Trash className="mr-2 h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </CardHeader>
-                    <CardContent className="flex-1">
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">Estado</div>
-                          <div className="text-2xl font-bold">{form.is_active ? "Activo" : "Borrador"}</div>
-                        </div>
-                        <div className="flex h-8 items-center">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              form.is_active ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            {form.is_active ? "Activo" : "Borrador"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {form.configs && form.configs.database && (
-                        <div className="mt-3 flex flex-wrap gap-1">
-                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-50">
-                            <Database className="h-3 w-3 mr-1" />
-                            {form.configs.database}
-                          </Badge>
-                        </div>
-                      )}
-                    </CardContent>
-                    <CardFooter className="flex justify-between mt-auto">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/forms/${form.id}`} target="_blank">
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver Formulario
-                        </Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          router.push(`/dashboard/form-builder/${form.id}`)
-                        }}
-                      >
-                        Editar
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-                <Card className="flex flex-col items-center justify-center p-6 h-full">
-                  <div className="rounded-full bg-muted p-3">
-                    <Plus className="h-6 w-6" />
+                {isLoading ? (
+                  <div className="col-span-full text-center py-12">
+                    <p>Cargando formularios...</p>
                   </div>
-                  <h3 className="mt-3 font-medium">Crear Nuevo Formulario</h3>
-                  <p className="text-sm text-muted-foreground text-center mt-1">
-                    Comienza a construir un nuevo formulario para tu negocio
-                  </p>
-                  <Button className="mt-4" variant="outline" onClick={() => setShowNewForm(true)}>
-                    Crear Formulario
-                  </Button>
-                </Card>
+                ) : error ? (
+                  <div className="col-span-full text-center py-12 text-red-500">
+                    {error}
+                  </div>
+                ) : forms.length === 0 ? (
+                  <Card className="flex flex-col items-center justify-center p-6 h-full">
+                    <div className="rounded-full bg-muted p-3">
+                      <Plus className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-3 font-medium">Crear Nuevo Formulario</h3>
+                    <p className="text-sm text-muted-foreground text-center mt-1">
+                      Comienza a construir un nuevo formulario para tu negocio
+                    </p>
+                    <Button className="mt-4" variant="outline" onClick={() => setShowNewForm(true)}>
+                      Crear Formulario
+                    </Button>
+                  </Card>
+                ) : (
+                  forms.map((form) => (
+                    <Card key={form.id} className="flex flex-col">
+                      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                        <div>
+                          <CardTitle>{form.name}</CardTitle>
+                          <CardDescription>Creado {new Date(form.creation_date!).toLocaleDateString()}</CardDescription>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Abrir menú</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Link
+                                href={`/dashboard/form-builder/${form.id}`}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Copy className="mr-2 h-4 w-4" />
+                              Duplicar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteForm(form.id)}>
+                              <Trash className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </CardHeader>
+                      <CardContent className="flex-1">
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">Estado</div>
+                            <div className="text-2xl font-bold">{form.is_active ? "Activo" : "Borrador"}</div>
+                          </div>
+                          <div className="flex h-8 items-center">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                form.is_active ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {form.is_active ? "Activo" : "Borrador"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {form.configs && form.configs.database && (
+                          <div className="mt-3 flex flex-wrap gap-1">
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-50">
+                              <Database className="h-3 w-3 mr-1" />
+                              {form.configs.database}
+                            </Badge>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="flex justify-between mt-auto">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/forms/${form.id}`} target="_blank">
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver Formulario
+                          </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            router.push(`/dashboard/form-builder/${form.id}`)
+                          }}
+                        >
+                          Editar
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))
+                )}
               </div>
             </div>
           </div>
