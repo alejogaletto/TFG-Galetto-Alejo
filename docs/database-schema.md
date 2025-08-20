@@ -4,6 +4,25 @@
 
 El sistema utiliza PostgreSQL con Supabase y está diseñado para manejar formularios dinámicos, esquemas virtuales de bases de datos, flujos de trabajo y almacenamiento inteligente de datos.
 
+## Constructor de Base de Datos (Database Builder)
+
+Para información completa sobre el Constructor de Base de Datos, consulta la documentación dedicada:
+
+**[📚 Constructor de Base de Datos](./database-builder.md)**
+
+### Resumen de Funcionalidad
+- **Creación visual** de esquemas virtuales de base de datos
+- **Plantillas predefinidas** (Clientes, Productos, Pedidos, Tareas)
+- **Wizard de 4 pasos** para configuración intuitiva
+- **Integración automática** con el sistema de formularios
+- **Simulación de bases de datos reales** sin conocimientos técnicos
+
+### APIs Relacionadas
+- `POST /api/virtual-schemas` - Crear esquema virtual
+- `POST /api/virtual-table-schemas` - Crear tabla virtual  
+- `POST /api/virtual-field-schemas` - Crear campo virtual
+- `GET /api/virtual-schemas?includeTree=true` - Obtener esquema completo
+
 ## Tablas Principales
 
 ### 1. Usuarios (User)
@@ -65,6 +84,7 @@ CREATE TABLE "VirtualSchema" (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   user_id INTEGER REFERENCES "User"(id) ON DELETE CASCADE,
+  configs JSONB,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -72,6 +92,7 @@ CREATE TABLE "VirtualSchema" (
 
 **Propósito**: Simula bases de datos creadas por usuarios
 **Relaciones**: Un usuario puede tener múltiples esquemas virtuales
+**Configuraciones**: Tipo de base de datos, modo avanzado, método de creación
 
 ### 5. Tablas Virtuales (VirtualTableSchema)
 ```sql
@@ -86,7 +107,7 @@ CREATE TABLE "VirtualTableSchema" (
 ```
 
 **Propósito**: Define tablas dentro de esquemas virtuales
-**Configuraciones**: Propiedades de tabla, índices, restricciones
+**Configuraciones**: Propiedades de tabla, índices, restricciones, conteo de campos
 
 ### 6. Campos Virtuales (VirtualFieldSchema)
 ```sql
@@ -103,7 +124,7 @@ CREATE TABLE "VirtualFieldSchema" (
 
 **Propósito**: Define campos de tablas virtuales
 **Tipos**: text, integer, boolean, date, jsonb, etc.
-**Configuraciones**: Restricciones, valores por defecto, validaciones
+**Configuraciones**: Restricciones, valores por defecto, validaciones, campo primario
 
 ### 7. Conexiones de Datos (DataConnection)
 ```sql

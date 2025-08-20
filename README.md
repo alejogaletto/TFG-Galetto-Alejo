@@ -7,6 +7,7 @@ Este proyecto es una aplicación web desarrollada como trabajo final de grado (T
 ## 🚀 Características Principales
 
 - **Sistema de Formularios Dinámicos**: Creación y gestión de formularios con campos personalizables
+- **Constructor de Base de Datos**: Creación visual de esquemas virtuales con plantillas predefinidas
 - **Esquemas Virtuales de Base de Datos**: Simulación de creación de bases de datos por usuarios
 - **Flujos de Trabajo Automatizados**: Definición y ejecución de flujos de trabajo
 - **Almacenamiento Inteligente**: Sistema que decide automáticamente dónde almacenar los datos
@@ -53,12 +54,26 @@ npm run dev
 | **Flujos** | `/api/workflows` | CRUD + pasos anidados |
 | **Envíos** | `/api/form-submissions` | Sistema inteligente |
 
+## 🆕 Constructor de Base de Datos
+
+### Funcionalidad
+- **Creación visual** de bases de datos virtuales
+- **Plantillas predefinidas**: Clientes, Productos, Pedidos, Tareas
+- **Wizard de 4 pasos** para configuración intuitiva
+- **Integración automática** con el sistema de formularios
+
+### Acceso
+- **Ruta**: `/dashboard/databases/new`
+- **Botones**: "Nueva Base de Datos" y "Crear Base de Datos"
+- **Resultado**: Crea automáticamente VirtualSchema + VirtualTableSchema + VirtualFieldSchema
+
 ## 📚 Documentación Completa
 
 Para información detallada, consulta la carpeta [`docs/`](./docs/):
 
 - **[🚀 Configuración y Despliegue](./docs/setup-deployment.md)** - Setup completo y despliegue
 - **[🗄️ Esquema de Base de Datos](./docs/database-schema.md)** - Estructura de tablas y relaciones
+- **[🏗️ Constructor de Base de Datos](./docs/database-builder.md)** - **Database Builder** completo
 - **[🔌 API Endpoints](./docs/api-endpoints.md)** - Documentación completa de APIs
 - **[📝 Sistema de Formularios](./docs/form-submissions.md)** - Explicación del sistema inteligente
 
@@ -68,6 +83,12 @@ Para información detallada, consulta la carpeta [`docs/`](./docs/):
 - Campos dinámicos con validaciones configurables
 - Renderizado automático basado en esquemas
 - Almacenamiento inteligente (BD empresarial o genérico)
+
+### Constructor de Base de Datos
+- **Plantillas predefinidas** para casos de uso comunes
+- **Estructura personalizable** para esquemas únicos
+- **Creación automática** de esquemas virtuales
+- **Integración perfecta** con el sistema de formularios
 
 ### Esquemas Virtuales
 - Creación de "bases de datos" simuladas
@@ -86,6 +107,7 @@ TFG-Galetto-Alejo/
 ├── app/                    # Next.js App Router
 │   ├── api/               # API Routes
 │   ├── dashboard/         # Panel de administración
+│   │   └── databases/     # Constructor de bases de datos
 │   ├── forms/            # Formularios públicos
 │   └── auth/             # Autenticación
 ├── components/            # Componentes reutilizables
@@ -96,18 +118,23 @@ TFG-Galetto-Alejo/
 
 ## 🚀 Uso Rápido
 
-### 1. Crear Formulario
+### 1. Crear Base de Datos
+- Dashboard → Bases de Datos → Nueva Base de Datos
+- Elegir plantilla o crear desde cero
+- Configurar estructura de tablas y campos
+- Sistema crea automáticamente el esquema virtual
+
+### 2. Crear Formulario
 - Dashboard → Formularios → Nuevo Formulario
 - Configurar campos y validaciones
 - Guardar formulario
 
-### 2. Conectar a Base de Datos
-- Database Builder → Crear Esquema
-- Definir tablas y campos
-- Conectar formulario al esquema
-- Mapear campos
+### 3. Conectar Formulario a Base de Datos
+- Dashboard → Formularios → Conectar Base de Datos
+- Seleccionar esquema virtual creado
+- Mapear campos del formulario a campos de la base de datos
 
-### 3. Crear Flujo de Trabajo
+### 4. Crear Flujo de Trabajo
 - Workflows → Nuevo Workflow
 - Definir pasos y configuraciones
 - Configurar posiciones de ejecución
@@ -126,9 +153,19 @@ curl -X POST http://localhost:3000/api/users \
 curl "http://localhost:3000/api/virtual-schemas/1?includeTree=true"
 ```
 
+### Crear Base de Datos con Constructor (via UI)
+1. Ve a `/dashboard/databases/new`
+2. Selecciona plantilla "Clientes"
+3. Confirma la creación
+4. Sistema crea automáticamente:
+   - VirtualSchema: "Base de Datos de Clientes"
+   - VirtualTableSchema: "Customers"
+   - VirtualFieldSchema: ID, Name, Email, Phone, Address, Created At
+
 ## 📞 Soporte
 
 - **Documentación**: Revisar carpeta [`docs/`](./docs/)
+- **Constructor de BD**: Ver [Constructor de Base de Datos](./docs/database-builder.md)
 - **Issues**: Crear issue en GitHub para problemas
 - **Logs**: Verificar consola y logs del servidor
 
@@ -153,4 +190,6 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ---
 
 **💡 Tip**: Para información técnica detallada, consulta la carpeta [`docs/`](./docs/)
+
+**🆕 Nuevo**: Constructor de Base de Datos visual para crear esquemas virtuales sin conocimientos técnicos
 

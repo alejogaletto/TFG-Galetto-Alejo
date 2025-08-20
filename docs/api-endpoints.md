@@ -72,11 +72,31 @@
 ### Eliminar Campo
 - **DELETE** `/api/form-fields/[id]`
 
+## Constructor de Base de Datos (Database Builder)
+
+Para información completa sobre el Constructor de Base de Datos, consulta la documentación dedicada:
+
+**[📚 Constructor de Base de Datos](./database-builder.md)**
+
+### Resumen de Funcionalidad
+- **Creación visual** de esquemas virtuales de base de datos
+- **Plantillas predefinidas** (Clientes, Productos, Pedidos, Tareas)
+- **Wizard de 4 pasos** para configuración intuitiva
+- **Integración automática** con el sistema de formularios
+- **Simulación de bases de datos reales** sin conocimientos técnicos
+
+### APIs Relacionadas
+- `POST /api/virtual-schemas` - Crear esquema virtual
+- `POST /api/virtual-table-schemas` - Crear tabla virtual  
+- `POST /api/virtual-field-schemas` - Crear campo virtual
+- `GET /api/virtual-schemas?includeTree=true` - Obtener esquema completo
+
 ## Esquemas Virtuales (VirtualSchemas)
 
 ### Crear Esquema
 - **POST** `/api/virtual-schemas`
-- **Body**: `{ "name": "string", "description": "string", "user_id": "number" }`
+- **Body**: `{ "name": "string", "description": "string", "user_id": "number", "configs": "object" }`
+- **Configs**: `{ "type": "customers|products|orders|tasks|blank", "advanced_mode": boolean, "created_via": "database_builder" }`
 
 ### Listar Esquemas
 - **GET** `/api/virtual-schemas`
@@ -104,6 +124,7 @@
 ### Crear Tabla
 - **POST** `/api/virtual-table-schemas`
 - **Body**: `{ "name": "string", "virtual_schema_id": "number", "configs": "object" }`
+- **Configs**: `{ "description": "string", "fields_count": "number", "created_via": "database_builder" }`
 
 ### Listar Tablas
 - **GET** `/api/virtual-table-schemas`
@@ -124,6 +145,7 @@
 ### Crear Campo
 - **POST** `/api/virtual-field-schemas`
 - **Body**: `{ "name": "string", "type": "string", "virtual_table_schema_id": "number", "configs": "object" }`
+- **Configs**: `{ "required": boolean, "unique": boolean, "description": "string", "is_primary": boolean, "created_via": "database_builder" }`
 
 ### Listar Campos
 - **GET** `/api/virtual-field-schemas`
@@ -276,6 +298,48 @@ curl -X POST http://localhost:3000/api/users \
   }'
 ```
 
+### Crear Base de Datos con Constructor
+```bash
+# 1. Crear esquema virtual
+curl -X POST http://localhost:3000/api/virtual-schemas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Base de Datos de Clientes",
+    "description": "Almacena información de clientes",
+    "user_id": 1,
+    "configs": {
+      "type": "customers",
+      "created_via": "database_builder"
+    }
+  }'
+
+# 2. Crear tabla virtual
+curl -X POST http://localhost:3000/api/virtual-table-schemas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customers",
+    "virtual_schema_id": 1,
+    "configs": {
+      "description": "Información de clientes",
+      "fields_count": 6
+    }
+  }'
+
+# 3. Crear campo virtual
+curl -X POST http://localhost:3000/api/virtual-field-schemas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "email",
+    "type": "email",
+    "virtual_table_schema_id": 1,
+    "configs": {
+      "required": true,
+      "unique": true,
+      "description": "Email del cliente"
+    }
+  }'
+```
+
 ### Crear Formulario con Campos
 ```bash
 # 1. Crear formulario
@@ -316,3 +380,4 @@ curl "http://localhost:3000/api/workflows/1?includeSteps=true"
 - **Hashing**: Las contraseñas se hashean automáticamente con bcrypt
 - **JSONB**: Los campos `configs` permiten configuración flexible por tipo
 - **Relaciones**: Las consultas pueden incluir datos relacionados con parámetros específicos
+- **Constructor**: El Database Builder crea automáticamente la estructura completa de VirtualSchemas

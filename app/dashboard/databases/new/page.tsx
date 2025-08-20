@@ -25,9 +25,11 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useToast } from "@/hooks/use-toast"
 
 export default function NewDatabasePage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [step, setStep] = useState(1)
   const [advancedMode, setAdvancedMode] = useState(false)
   const [progress, setProgress] = useState(25)
@@ -38,6 +40,7 @@ export default function NewDatabasePage() {
   const [showAddFieldDialog, setShowAddFieldDialog] = useState(false)
   const [showAddTableDialog, setShowAddTableDialog] = useState(false)
   const [selectedTableIndex, setSelectedTableIndex] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState(1) // TODO: Get from auth context
 
   // New field state
   const [newField, setNewField] = useState({
@@ -79,12 +82,207 @@ export default function NewDatabasePage() {
     setProgress(prevStep * 25)
   }
 
-  const handleCreateDatabase = () => {
+  const createVirtualSchema = async () => {
+    try {
+      const response = await fetch('/api/virtual-schemas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: databaseName,
+          description: databaseDescription,
+          user_id: currentUserId,
+          configs: {
+            type: databaseType,
+            advanced_mode: advancedMode,
+            created_via: 'database_builder'
+          }
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to create VirtualSchema: ${response.statusText}`)
+      }
+
+      const virtualSchema = await response.json()
+      return virtualSchema
+    } catch (error) {
+      console.error('Error creating VirtualSchema:', error)
+      throw error
+    }
+  }
+
+  const createVirtualTableSchema = async (table, virtualSchemaId) => {
+    try {
+      const response = await fetch('/api/virtual-table-schemas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: table.name,
+          virtual_schema_id: virtualSchemaId,
+          configs: {
+            description: table.description,
+            fields_count: table.fields.length,
+            created_via: 'database_builder'
+          }
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to create VirtualTableSchema: ${response.statusText}`)
+      }
+
+      const virtualTableSchema = await response.json()
+      return virtualTableSchema
+    } catch (error) {
+      console.error('Error creating VirtualTableSchema:', error)
+      throw error
+    }
+  }
+
+  const createVirtualFieldSchema = async (field, virtualTableSchemaId) => {
+    try {
+      const response = await fetch('/api/virtual-field-schemas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: field.name,
+          type: field.type,
+          virtual_table_schema_id: virtualTableSchemaId,
+          configs: {
+            required: field.required,
+            unique: field.unique,
+            description: field.description,
+            is_primary: field.type === 'id',
+            created_via: 'database_builder'
+          }
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to create VirtualFieldSchema: ${response.statusText}`)
+      }
+
+      const virtualFieldSchema = await response.json()
+      return virtualFieldSchema
+    } catch (error) {
+      console.error('Error creating VirtualFieldSchema:', error)
+      throw error
+    }
+  }
+
+  const handleCreateDatabase = async () => {
     setIsCreating(true)
-    // Simulate database creation
-    setTimeout(() => {
-      router.push("/dashboard/database-builder")
-    }, 1500)
+    
+    try {
+      // Step 1: Create VirtualSchema
+      toast({
+        title: "Creando esquema virtual...",
+        description: "Creando la base de datos virtual",
+      })
+      
+      const virtualSchema = await createVirtualSchema()
+      
+      // Step 2: Create VirtualTableSchemas and VirtualFieldSchemas
+      for (const table of tables) {
+        toast({
+          title: "Creando tabla...",
+          description: `Creando tabla: ${table.name}`,
+        })
+        
+        const virtualTableSchema = await createVirtualTableSchema(table, virtualSchema.id)
+        
+        // Step 3: Create VirtualFieldSchemas for this table
+        for (const field of table.fields) {
+          await createVirtualFieldSchema(field, virtualTableSchema.id)
+        }
+      }
+      
+      toast({
+        title: "¡Base de datos creada!",
+        description: "Redirigiendo al constructor de base de datos",
+      })
+      
+      // Redirect to the created database
+      router.push(`/dashboard/databases/${virtualSchema.id}`)
+      
+    } catch (error) {
+      console.error('Error creating database:', error)
+      toast({
+        title: "Error al crear la base de datos",
+        description: error.message || "Ocurrió un error inesperado",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleTemplateSelection = (templateId) => {
+    setDatabaseType(templateId)
+    
+    // Set up tables based on template
+    if (templateId === 'customers') {
+      setTables([{
+        name: "Customers",
+        description: "Almacenar y gestionar información de clientes",
+        fields: [
+          { name: "ID", type: "id", required: true, unique: true, description: "Auto-generated identifier" },
+          { name: "Name", type: "text", required: true, unique: false, description: "Nombre completo del cliente" },
+          { name: "Email", type: "email", required: true, unique: true, description: "Email del cliente" },
+          { name: "Phone", type: "phone", required: false, unique: false, description: "Teléfono del cliente" },
+          { name: "Address", type: "text", required: false, unique: false, description: "Dirección del cliente" },
+          { name: "Created At", type: "datetime", required: true, unique: false, description: "Fecha de creación" },
+        ],
+      }])
+    } else if (templateId === 'products') {
+      setTables([{
+        name: "Products",
+        description: "Rastrea tu inventario y detalles de productos",
+        fields: [
+          { name: "ID", type: "id", required: true, unique: true, description: "Auto-generated identifier" },
+          { name: "Name", type: "text", required: true, unique: false, description: "Nombre del producto" },
+          { name: "SKU", type: "text", required: true, unique: true, description: "Código SKU del producto" },
+          { name: "Price", type: "number", required: true, unique: false, description: "Precio del producto" },
+          { name: "Stock", type: "number", required: true, unique: false, description: "Cantidad en stock" },
+          { name: "Category", type: "text", required: false, unique: false, description: "Categoría del producto" },
+          { name: "Description", type: "text", required: false, unique: false, description: "Descripción del producto" },
+          { name: "Created At", type: "datetime", required: true, unique: false, description: "Fecha de creación" },
+        ],
+      }])
+    } else if (templateId === 'orders') {
+      setTables([{
+        name: "Orders",
+        description: "Gestiona pedidos y transacciones de clientes",
+        fields: [
+          { name: "ID", type: "id", required: true, unique: true, description: "Auto-generated identifier" },
+          { name: "Order ID", type: "text", required: true, unique: true, description: "ID del pedido" },
+          { name: "Customer", type: "text", required: true, unique: false, description: "Cliente del pedido" },
+          { name: "Products", type: "text", required: true, unique: false, description: "Productos del pedido" },
+          { name: "Total", type: "number", required: true, unique: false, description: "Total del pedido" },
+          { name: "Status", type: "select", required: true, unique: false, description: "Estado del pedido" },
+          { name: "Date", type: "datetime", required: true, unique: false, description: "Fecha del pedido" },
+        ],
+      }])
+    } else if (templateId === 'tasks') {
+      setTables([{
+        name: "Tasks",
+        description: "Rastrea tareas y gestión de proyectos",
+        fields: [
+          { name: "ID", type: "id", required: true, unique: true, description: "Auto-generated identifier" },
+          { name: "Title", type: "text", required: true, unique: false, description: "Título de la tarea" },
+          { name: "Description", type: "text", required: false, unique: false, description: "Descripción de la tarea" },
+          { name: "Status", type: "select", required: true, unique: false, description: "Estado de la tarea" },
+          { name: "Assignee", type: "text", required: false, unique: false, description: "Persona asignada" },
+          { name: "Due Date", type: "datetime", required: false, unique: false, description: "Fecha de vencimiento" },
+        ],
+      }])
+    }
   }
 
   const handleAddField = () => {
@@ -280,7 +478,7 @@ export default function NewDatabasePage() {
                       <div
                         key={template.id}
                         className={`flex flex-col rounded-lg border p-4 cursor-pointer hover:border-primary/50 ${databaseType === template.id ? "border-primary bg-primary/5" : ""}`}
-                        onClick={() => setDatabaseType(template.id)}
+                        onClick={() => handleTemplateSelection(template.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
