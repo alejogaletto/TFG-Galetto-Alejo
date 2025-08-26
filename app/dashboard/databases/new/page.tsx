@@ -84,6 +84,17 @@ export default function NewDatabasePage() {
 
   const createVirtualSchema = async () => {
     try {
+      console.log('Creating VirtualSchema:', {
+        name: databaseName,
+        description: databaseDescription,
+        user_id: currentUserId,
+        configs: {
+          type: databaseType,
+          advanced_mode: advancedMode,
+          created_via: 'database_builder'
+        }
+      })
+
       const response = await fetch('/api/virtual-schemas', {
         method: 'POST',
         headers: {
@@ -102,10 +113,13 @@ export default function NewDatabasePage() {
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to create VirtualSchema: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error('Failed to create VirtualSchema:', response.status, errorText)
+        throw new Error(`Failed to create VirtualSchema: ${response.status} - ${errorText}`)
       }
 
       const virtualSchema = await response.json()
+      console.log('Successfully created VirtualSchema:', virtualSchema)
       return virtualSchema
     } catch (error) {
       console.error('Error creating VirtualSchema:', error)
@@ -113,8 +127,10 @@ export default function NewDatabasePage() {
     }
   }
 
-  const createVirtualTableSchema = async (table, virtualSchemaId) => {
+  const createVirtualTableSchema = async (table: any, virtualSchemaId: number) => {
     try {
+      console.log('Creating VirtualTableSchema:', table, 'for schema ID:', virtualSchemaId)
+      
       const response = await fetch('/api/virtual-table-schemas', {
         method: 'POST',
         headers: {
@@ -132,10 +148,13 @@ export default function NewDatabasePage() {
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to create VirtualTableSchema: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error('Failed to create VirtualTableSchema:', response.status, errorText)
+        throw new Error(`Failed to create VirtualTableSchema: ${response.status} - ${errorText}`)
       }
 
       const virtualTableSchema = await response.json()
+      console.log('Successfully created VirtualTableSchema:', virtualTableSchema)
       return virtualTableSchema
     } catch (error) {
       console.error('Error creating VirtualTableSchema:', error)
@@ -143,8 +162,10 @@ export default function NewDatabasePage() {
     }
   }
 
-  const createVirtualFieldSchema = async (field, virtualTableSchemaId) => {
+  const createVirtualFieldSchema = async (field: any, virtualTableSchemaId: number) => {
     try {
+      console.log('Creating VirtualFieldSchema:', field, 'for table ID:', virtualTableSchemaId) // Debug log
+      
       const response = await fetch('/api/virtual-field-schemas', {
         method: 'POST',
         headers: {
@@ -165,10 +186,13 @@ export default function NewDatabasePage() {
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to create VirtualFieldSchema: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error('Failed to create VirtualFieldSchema:', response.status, errorText) // Debug log
+        throw new Error(`Failed to create VirtualFieldSchema: ${response.status} - ${errorText}`)
       }
 
       const virtualFieldSchema = await response.json()
+      console.log('Successfully created VirtualFieldSchema:', virtualFieldSchema) // Debug log
       return virtualFieldSchema
     } catch (error) {
       console.error('Error creating VirtualFieldSchema:', error)
@@ -180,6 +204,9 @@ export default function NewDatabasePage() {
     setIsCreating(true)
     
     try {
+      console.log('Starting database creation process...')
+      console.log('Tables to create:', tables)
+      
       // Step 1: Create VirtualSchema
       toast({
         title: "Creando esquema virtual...",
@@ -187,8 +214,18 @@ export default function NewDatabasePage() {
       })
       
       const virtualSchema = await createVirtualSchema()
+      console.log('VirtualSchema created with ID:', virtualSchema.id)
+      
+      // Validate that we got a valid ID
+      if (!virtualSchema.id || typeof virtualSchema.id !== 'number') {
+        console.error('Invalid VirtualSchema ID received:', virtualSchema)
+        throw new Error('Failed to create VirtualSchema: Invalid ID returned')
+      }
       
       // Step 2: Create VirtualTableSchemas and VirtualFieldSchemas
+      const createdTables = []
+      const createdFields = []
+      
       for (const table of tables) {
         toast({
           title: "Creando tabla...",
@@ -196,26 +233,42 @@ export default function NewDatabasePage() {
         })
         
         const virtualTableSchema = await createVirtualTableSchema(table, virtualSchema.id)
+        createdTables.push(virtualTableSchema)
+        console.log(`Table "${table.name}" created with ID:`, virtualTableSchema.id)
         
         // Step 3: Create VirtualFieldSchemas for this table
         for (const field of table.fields) {
-          await createVirtualFieldSchema(field, virtualTableSchema.id)
+          const virtualFieldSchema = await createVirtualFieldSchema(field, virtualTableSchema.id)
+          createdFields.push(virtualFieldSchema)
+          console.log(`Field "${field.name}" created with ID:`, virtualFieldSchema.id)
         }
       }
       
+      console.log('Database creation completed successfully!')
+      console.log('Total tables created:', createdTables.length)
+      console.log('Total fields created:', createdFields.length)
+      
       toast({
         title: "¡Base de datos creada!",
-        description: "Redirigiendo al constructor de base de datos",
+        description: `Creada con ${createdTables.length} tablas y ${createdFields.length} campos. Redirigiendo...`,
       })
       
+      // Add a small delay to ensure all data is committed to the database
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Log the redirect URL for debugging
+      const redirectUrl = `/dashboard/databases/${virtualSchema.id}`
+      console.log('Redirecting to:', redirectUrl)
+      console.log('VirtualSchema object:', virtualSchema)
+      
       // Redirect to the created database
-      router.push(`/dashboard/databases/${virtualSchema.id}`)
+      router.push(redirectUrl)
       
     } catch (error) {
       console.error('Error creating database:', error)
       toast({
         title: "Error al crear la base de datos",
-        description: error.message || "Ocurrió un error inesperado",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado",
         variant: "destructive",
       })
     } finally {
@@ -223,12 +276,13 @@ export default function NewDatabasePage() {
     }
   }
 
-  const handleTemplateSelection = (templateId) => {
+  const handleTemplateSelection = (templateId: string) => {
+    console.log('Template selected:', templateId)
     setDatabaseType(templateId)
     
     // Set up tables based on template
     if (templateId === 'customers') {
-      setTables([{
+      const customersTable = {
         name: "Customers",
         description: "Almacenar y gestionar información de clientes",
         fields: [
@@ -239,9 +293,11 @@ export default function NewDatabasePage() {
           { name: "Address", type: "text", required: false, unique: false, description: "Dirección del cliente" },
           { name: "Created At", type: "datetime", required: true, unique: false, description: "Fecha de creación" },
         ],
-      }])
+      }
+      setTables([customersTable])
+      console.log('Customers template loaded:', customersTable)
     } else if (templateId === 'products') {
-      setTables([{
+      const productsTable = {
         name: "Products",
         description: "Rastrea tu inventario y detalles de productos",
         fields: [
@@ -254,9 +310,11 @@ export default function NewDatabasePage() {
           { name: "Description", type: "text", required: false, unique: false, description: "Descripción del producto" },
           { name: "Created At", type: "datetime", required: true, unique: false, description: "Fecha de creación" },
         ],
-      }])
+      }
+      setTables([productsTable])
+      console.log('Products template loaded:', productsTable)
     } else if (templateId === 'orders') {
-      setTables([{
+      const ordersTable = {
         name: "Orders",
         description: "Gestiona pedidos y transacciones de clientes",
         fields: [
@@ -268,9 +326,11 @@ export default function NewDatabasePage() {
           { name: "Status", type: "select", required: true, unique: false, description: "Estado del pedido" },
           { name: "Date", type: "datetime", required: true, unique: false, description: "Fecha del pedido" },
         ],
-      }])
+      }
+      setTables([ordersTable])
+      console.log('Orders template loaded:', ordersTable)
     } else if (templateId === 'tasks') {
-      setTables([{
+      const tasksTable = {
         name: "Tasks",
         description: "Rastrea tareas y gestión de proyectos",
         fields: [
@@ -281,8 +341,13 @@ export default function NewDatabasePage() {
           { name: "Assignee", type: "text", required: false, unique: false, description: "Persona asignada" },
           { name: "Due Date", type: "datetime", required: false, unique: false, description: "Fecha de vencimiento" },
         ],
-      }])
+      }
+      setTables([tasksTable])
+      console.log('Tasks template loaded:', tasksTable)
     }
+    
+    // Move to next step after template selection
+    handleNext()
   }
 
   const handleAddField = () => {
@@ -330,7 +395,7 @@ export default function NewDatabasePage() {
     setShowAddTableDialog(false)
   }
 
-  const handleRemoveField = (tableIndex, fieldIndex) => {
+  const handleRemoveField = (tableIndex: number, fieldIndex: number) => {
     // Don't allow removing ID field
     if (fieldIndex === 0) return
 
@@ -383,6 +448,27 @@ export default function NewDatabasePage() {
       icon: "✅",
     },
   ]
+
+  const canProceedToNext = () => {
+    if (step === 1) {
+      return databaseType !== ""
+    }
+    if (step === 2) {
+      return databaseName.trim() !== "" && databaseDescription.trim() !== ""
+    }
+    if (step === 3) {
+      return tables.length > 0 && tables.every(table => 
+        table.name.trim() !== "" && 
+        table.fields.length > 0 && 
+        table.fields.every(field => field.name.trim() !== "")
+      )
+    }
+    return true
+  }
+
+  const canCreateDatabase = () => {
+    return canProceedToNext() && !isCreating
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -598,7 +684,7 @@ export default function NewDatabasePage() {
                 <Button variant="outline" onClick={handleBack}>
                   Atrás
                 </Button>
-                <Button onClick={handleNext} disabled={!databaseName.trim()}>
+                <Button onClick={handleNext} disabled={!canProceedToNext()}>
                   Continuar
                 </Button>
               </div>
@@ -791,7 +877,7 @@ export default function NewDatabasePage() {
                         <p className="text-sm">
                           <span className="font-medium">{tables.length}</span> tabla(s) con un total de{" "}
                           <span className="font-medium">
-                            {tables.reduce((total, table) => total + table.fields.length, 0)}
+                            {tables.reduce((total: number, table: any) => total + table.fields.length, 0)}
                           </span>{" "}
                           campos
                         </p>
@@ -802,6 +888,42 @@ export default function NewDatabasePage() {
                             </Badge>
                           ))}
                         </div>
+                      </div>
+                      
+                      {/* Detailed breakdown of tables and fields */}
+                      <div className="mt-4 space-y-3">
+                        {tables.map((table, tableIndex) => (
+                          <div key={tableIndex} className="border rounded-md p-3 bg-muted/30">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-sm">{table.name}</h4>
+                              <Badge variant="secondary" className="text-xs">
+                                {table.fields.length} campos
+                              </Badge>
+                            </div>
+                            <div className="space-y-1">
+                              {table.fields.map((field, fieldIndex) => (
+                                <div key={fieldIndex} className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">{field.name}</span>
+                                  <div className="flex items-center gap-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {field.type}
+                                    </Badge>
+                                    {field.required && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        Requerido
+                                      </Badge>
+                                    )}
+                                    {field.unique && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        Único
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -834,7 +956,7 @@ export default function NewDatabasePage() {
                   <Button variant="outline" onClick={handleBack}>
                     Atrás
                   </Button>
-                  <Button onClick={handleCreateDatabase} disabled={isCreating}>
+                  <Button onClick={handleCreateDatabase} disabled={!canCreateDatabase()}>
                     {isCreating ? (
                       <>
                         <svg

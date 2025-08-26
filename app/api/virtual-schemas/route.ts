@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
   const { user_id, name, description, configs } = await req.json() as VirtualSchema;
   const { data, error } = await supabase.from('VirtualSchema').insert([{ user_id, name, description, configs }]).select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+  if (!data || data.length === 0) return NextResponse.json({ error: 'Failed to create virtual schema' }, { status: 500 });
+  return NextResponse.json(data[0], { status: 201 });
 }
 
 // Get all virtual schemas

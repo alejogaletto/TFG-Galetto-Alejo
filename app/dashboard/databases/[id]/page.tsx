@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { 
   ArrowLeft, 
   Database, 
@@ -31,14 +31,17 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface VirtualFieldSchema {
   id: number
   name: string
   type: string
-  configs: any
+  properties: any
 }
 
 interface VirtualTableSchema {
@@ -59,11 +62,35 @@ interface VirtualSchema {
 
 export default function DatabasePage() {
   const params = useParams()
+  const router = useRouter()
   const { toast } = useToast()
   const [database, setDatabase] = useState<VirtualSchema | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("overview")
+  
+  // State for adding/editing tables and fields
+  const [showAddTableDialog, setShowAddTableDialog] = useState(false)
+  const [showAddFieldDialog, setShowAddFieldDialog] = useState(false)
+  const [showEditTableDialog, setShowEditTableDialog] = useState(false)
+  const [showEditFieldDialog, setShowEditFieldDialog] = useState(false)
+  const [selectedTable, setSelectedTable] = useState<VirtualTableSchema | null>(null)
+  const [selectedField, setSelectedField] = useState<VirtualFieldSchema | null>(null)
+  
+  // Form state for new table
+  const [newTable, setNewTable] = useState({
+    name: "",
+    description: ""
+  })
+  
+  // Form state for new field
+  const [newField, setNewField] = useState({
+    name: "",
+    type: "text",
+    required: false,
+    unique: false,
+    description: ""
+  })
 
   useEffect(() => {
     if (params.id) {
@@ -74,19 +101,276 @@ export default function DatabasePage() {
   const fetchDatabase = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/virtual-schemas/${id}?includeTree=true`)
+      console.log('Fetching database with ID:', id) // Debug log
+      
+      // Use the dedicated tree endpoint to get schema with nested tables and fields
+      const response = await fetch(`/api/virtual-schemas/${id}/tree`)
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch database: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error('Response not ok:', response.status, errorText) // Debug log
+        throw new Error(`Failed to fetch database: ${response.status} - ${errorText}`)
       }
       
       const data = await response.json()
+      console.log('Fetched database data:', data) // Debug log
+      console.log('Tables count:', data.tables?.length || 0) // Debug log
+      console.log('Total fields count:', data.tables?.reduce((acc: number, table: any) => acc + (table.fields?.length || 0), 0) || 0) // Debug log
+      
       setDatabase(data)
     } catch (err) {
       console.error('Error fetching database:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // CRUD functions for tables
+  const createTable = async () => {
+    if (!database || !newTable.name.trim()) return
+    
+    try {
+      const response = await fetch('/api/virtual-table-schemas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newTable.name,
+          virtual_schema_id: database.id,
+          configs: {
+            description: newTable.description,
+            fields_count: 0,
+            created_via: 'database_builder'
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create table')
+      }
+
+      const createdTable = await response.json()
+      
+      // Refresh database data
+      await fetchDatabase(params.id as string)
+      
+      // Reset form and close dialog
+      setNewTable({ name: "", description: "" })
+      setShowAddTableDialog(false)
+      
+      toast({
+        title: "Tabla creada",
+        description: `La tabla "${newTable.name}" ha sido creada exitosamente`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo crear la tabla",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateTable = async (tableId: number, updates: Partial<VirtualTableSchema>) => {
+    if (!database) return
+    
+    try {
+      const response = await fetch(`/api/virtual-table-schemas/${tableId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update table')
+      }
+
+      // Refresh database data
+      await fetchDatabase(params.id as string)
+      
+      setShowEditTableDialog(false)
+      setSelectedTable(null)
+      
+      toast({
+        title: "Tabla actualizada",
+        description: "La tabla ha sido actualizada exitosamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la tabla",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteTable = async (tableId: number) => {
+    if (!database) return
+    
+    try {
+      const response = await fetch(`/api/virtual-table-schemas/${tableId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete table')
+      }
+
+      // Refresh database data
+      await fetchDatabase(params.id as string)
+      
+      toast({
+        title: "Tabla eliminada",
+        description: "La tabla ha sido eliminada exitosamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la tabla",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // CRUD functions for fields
+  const createField = async () => {
+    if (!selectedTable || !newField.name.trim()) return
+    
+    try {
+      const response = await fetch('/api/virtual-field-schemas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newField.name,
+          type: newField.type,
+          virtual_table_schema_id: selectedTable.id,
+          properties: {
+            required: newField.required,
+            unique: newField.unique,
+            description: newField.description,
+            created_via: 'database_builder'
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create field')
+      }
+
+      // Refresh database data
+      await fetchDatabase(params.id as string)
+      
+      // Reset form and close dialog
+      setNewField({
+        name: "",
+        type: "text",
+        required: false,
+        unique: false,
+        description: ""
+      })
+      setShowAddFieldDialog(false)
+      setSelectedTable(null)
+      
+      toast({
+        title: "Campo creado",
+        description: `El campo "${newField.name}" ha sido creado exitosamente`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo crear el campo",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const updateField = async (fieldId: number, updates: Partial<VirtualFieldSchema>) => {
+    if (!database) return
+    
+    try {
+      const response = await fetch(`/api/virtual-field-schemas/${fieldId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update field')
+      }
+
+      // Refresh database data
+      await fetchDatabase(params.id as string)
+      
+      setShowEditFieldDialog(false)
+      setSelectedField(null)
+      
+      toast({
+        title: "Campo actualizado",
+        description: "El campo ha sido actualizado exitosamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el campo",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteField = async (fieldId: number) => {
+    if (!database) return
+    
+    try {
+      const response = await fetch(`/api/virtual-field-schemas/${fieldId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete field')
+      }
+
+      // Refresh database data
+      await fetchDatabase(params.id as string)
+      
+      toast({
+        title: "Campo eliminado",
+        description: "El campo ha sido eliminado exitosamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el campo",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Delete entire database
+  const deleteDatabase = async () => {
+    if (!database) return
+    
+    try {
+      const response = await fetch(`/api/virtual-schemas/${database.id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete database')
+      }
+
+      toast({
+        title: "Base de datos eliminada",
+        description: `La base de datos "${database.name}" ha sido eliminada exitosamente`,
+      })
+      
+      // Redirect to databases list
+      router.push('/dashboard/databases')
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la base de datos",
+        variant: "destructive",
+      })
     }
   }
 
@@ -113,6 +397,20 @@ export default function DatabasePage() {
         return <Type className="h-4 w-4" />
     }
   }
+
+  const dataTypes = [
+    { value: "text", label: "Texto" },
+    { value: "number", label: "Número" },
+    { value: "email", label: "Email" },
+    { value: "boolean", label: "Sí/No" },
+    { value: "datetime", label: "Fecha y Hora" },
+    { value: "date", label: "Fecha" },
+    { value: "id", label: "ID" },
+    { value: "file", label: "Archivo" },
+    { value: "url", label: "URL" },
+    { value: "phone", label: "Teléfono" },
+    { value: "select", label: "Lista Desplegable" },
+  ]
 
   if (loading) {
     return (
@@ -201,12 +499,39 @@ export default function DatabasePage() {
                     <Database className="h-4 w-4" />
                     <span>{table.name}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <Settings className="h-3 w-3" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <Settings className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedTable(table)
+                          setShowEditTableDialog(true)
+                        }}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="text-destructive"
+                        onClick={() => deleteTable(table.id)}
+                      >
+                        <Trash className="mr-2 h-4 w-4" />
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               ))}
-              <Button variant="outline" size="sm" className="w-full">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => setShowAddTableDialog(true)}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Agregar Tabla
               </Button>
@@ -253,12 +578,26 @@ export default function DatabasePage() {
             <div className="border-b">
               <div className="flex items-center px-4 py-2">
                 <h1 className="text-lg font-medium">{database.name}</h1>
-                <TabsList className="ml-auto">
-                  <TabsTrigger value="overview">Vista General</TabsTrigger>
-                  <TabsTrigger value="structure">Estructura</TabsTrigger>
-                  <TabsTrigger value="data">Datos</TabsTrigger>
-                  <TabsTrigger value="relations">Relaciones</TabsTrigger>
-                </TabsList>
+                <div className="ml-auto flex items-center gap-2">
+                  <TabsList>
+                    <TabsTrigger value="overview">Vista General</TabsTrigger>
+                    <TabsTrigger value="structure">Estructura</TabsTrigger>
+                    <TabsTrigger value="data">Datos</TabsTrigger>
+                    <TabsTrigger value="relations">Relaciones</TabsTrigger>
+                  </TabsList>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => {
+                      if (confirm(`¿Estás seguro de que quieres eliminar la base de datos "${database.name}"? Esta acción no se puede deshacer.`)) {
+                        deleteDatabase()
+                      }
+                    }}
+                  >
+                    <Trash className="h-4 w-4 mr-2" />
+                    Eliminar Base de Datos
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -301,11 +640,25 @@ export default function DatabasePage() {
                               {table.description || 'Sin descripción'}
                             </p>
                             <div className="flex gap-2">
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedTable(table)
+                                  setActiveTab("structure")
+                                }}
+                              >
                                 <Eye className="h-3 w-3 mr-1" />
                                 Ver
                               </Button>
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedTable(table)
+                                  setShowEditTableDialog(true)
+                                }}
+                              >
                                 <Edit className="h-3 w-3 mr-1" />
                                 Editar
                               </Button>
@@ -330,7 +683,20 @@ export default function DatabasePage() {
                       <div key={table.id} className="mb-6 last:mb-0">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-medium">{table.name}</h3>
-                          <Badge variant="outline">{table.fields?.length || 0} campos</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{table.fields?.length || 0} campos</Badge>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTable(table)
+                                setShowAddFieldDialog(true)
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Agregar Campo
+                            </Button>
+                          </div>
                         </div>
                         
                         <Table>
@@ -348,7 +714,7 @@ export default function DatabasePage() {
                             {table.fields?.map((field) => (
                               <TableRow key={field.id}>
                                 <TableCell className="font-medium">
-                                  {field.configs?.is_primary && <Key className="h-3 w-3 inline mr-1 text-amber-500" />}
+                                  {field.properties?.is_primary && <Key className="h-3 w-3 inline mr-1 text-amber-500" />}
                                   {field.name}
                                 </TableCell>
                                 <TableCell>
@@ -358,20 +724,20 @@ export default function DatabasePage() {
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  {field.configs?.required ? (
+                                  {field.properties?.required ? (
                                     <Check className="h-4 w-4 text-green-500" />
                                   ) : (
                                     <span className="text-muted-foreground">-</span>
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  {field.configs?.unique ? (
+                                  {field.properties?.unique ? (
                                     <Check className="h-4 w-4 text-green-500" />
                                   ) : (
                                     <span className="text-muted-foreground">-</span>
                                   )}
                                 </TableCell>
-                                <TableCell>{field.configs?.description || 'Sin descripción'}</TableCell>
+                                <TableCell>{field.properties?.description || 'Sin descripción'}</TableCell>
                                 <TableCell>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -380,11 +746,19 @@ export default function DatabasePage() {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                      <DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setSelectedField(field)
+                                          setShowEditFieldDialog(true)
+                                        }}
+                                      >
                                         <Edit className="mr-2 h-4 w-4" />
                                         Editar
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem className="text-destructive">
+                                      <DropdownMenuItem 
+                                        className="text-destructive"
+                                        onClick={() => deleteField(field.id)}
+                                      >
                                         <Trash className="mr-2 h-4 w-4" />
                                         Eliminar
                                       </DropdownMenuItem>
@@ -447,6 +821,246 @@ export default function DatabasePage() {
           </Tabs>
         </main>
       </div>
+
+      {/* Add Table Dialog */}
+      <Dialog open={showAddTableDialog} onOpenChange={setShowAddTableDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar Nueva Tabla</DialogTitle>
+            <DialogDescription>Crea una nueva tabla para tu base de datos.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="table-name">Nombre de la Tabla</Label>
+              <Input
+                id="table-name"
+                value={newTable.name}
+                onChange={(e) => setNewTable({ ...newTable, name: e.target.value })}
+                placeholder="ej. Productos"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="table-description">Descripción (Opcional)</Label>
+              <Textarea
+                id="table-description"
+                value={newTable.description}
+                onChange={(e) => setNewTable({ ...newTable, description: e.target.value })}
+                placeholder="¿Qué tipo de datos almacenará esta tabla?"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddTableDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={createTable} disabled={!newTable.name.trim()}>
+              Agregar Tabla
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Table Dialog */}
+      <Dialog open={showEditTableDialog} onOpenChange={setShowEditTableDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Tabla</DialogTitle>
+            <DialogDescription>Modifica la información de la tabla.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-table-name">Nombre de la Tabla</Label>
+              <Input
+                id="edit-table-name"
+                value={selectedTable?.name || ""}
+                onChange={(e) => setSelectedTable(prev => prev ? { ...prev, name: e.target.value } : null)}
+                placeholder="ej. Productos"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-table-description">Descripción</Label>
+              <Textarea
+                id="edit-table-description"
+                value={selectedTable?.description || ""}
+                onChange={(e) => setSelectedTable(prev => prev ? { ...prev, description: e.target.value } : null)}
+                placeholder="¿Qué tipo de datos almacenará esta tabla?"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditTableDialog(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={() => selectedTable && updateTable(selectedTable.id, selectedTable)}
+              disabled={!selectedTable?.name?.trim()}
+            >
+              Actualizar Tabla
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Field Dialog */}
+      <Dialog open={showAddFieldDialog} onOpenChange={setShowAddFieldDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar Nuevo Campo</DialogTitle>
+            <DialogDescription>Define las propiedades para tu nuevo campo de base de datos.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="field-name">Nombre del Campo</Label>
+                <Input
+                  id="field-name"
+                  value={newField.name}
+                  onChange={(e) => setNewField({ ...newField, name: e.target.value })}
+                  placeholder="ej. direccion_email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="field-type">Tipo de Dato</Label>
+                <Select value={newField.type} onValueChange={(value) => setNewField({ ...newField, type: value })}>
+                  <SelectTrigger id="field-type">
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dataTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="field-description">Descripción (Opcional)</Label>
+              <Textarea
+                id="field-description"
+                value={newField.description}
+                onChange={(e) => setNewField({ ...newField, description: e.target.value })}
+                placeholder="¿Para qué se usa este campo?"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="field-required"
+                  checked={newField.required}
+                  onCheckedChange={(checked) => setNewField({ ...newField, required: checked === true })}
+                />
+                <Label htmlFor="field-required">Campo Requerido</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="field-unique"
+                  checked={newField.unique}
+                  onCheckedChange={(checked) => setNewField({ ...newField, unique: checked === true })}
+                />
+                <Label htmlFor="field-unique">Solo Valores Únicos</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddFieldDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={createField} disabled={!newField.name.trim()}>
+              Agregar Campo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Field Dialog */}
+      <Dialog open={showEditFieldDialog} onOpenChange={setShowEditFieldDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Campo</DialogTitle>
+            <DialogDescription>Modifica las propiedades del campo.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-field-name">Nombre del Campo</Label>
+                <Input
+                  id="edit-field-name"
+                  value={selectedField?.name || ""}
+                  onChange={(e) => setSelectedField(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  placeholder="ej. direccion_email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-field-type">Tipo de Dato</Label>
+                <Select 
+                  value={selectedField?.type || "text"} 
+                  onValueChange={(value) => setSelectedField(prev => prev ? { ...prev, type: value } : null)}
+                >
+                  <SelectTrigger id="edit-field-type">
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dataTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-field-description">Descripción</Label>
+              <Textarea
+                id="edit-field-description"
+                value={selectedField?.properties?.description || ""}
+                onChange={(e) => setSelectedField(prev => prev ? { 
+                  ...prev, 
+                  properties: { ...prev.properties, description: e.target.value }
+                } : null)}
+                placeholder="¿Para qué se usa este campo?"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="edit-field-required"
+                  checked={selectedField?.properties?.required || false}
+                  onCheckedChange={(checked) => setSelectedField(prev => prev ? { 
+                    ...prev, 
+                    properties: { ...prev.properties, required: checked === true }
+                  } : null)}
+                />
+                <Label htmlFor="edit-field-required">Campo Requerido</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="edit-field-unique"
+                  checked={selectedField?.properties?.unique || false}
+                  onCheckedChange={(checked) => setSelectedField(prev => prev ? { 
+                    ...prev, 
+                    properties: { ...prev.properties, unique: checked === true }
+                  } : null)}
+                />
+                <Label htmlFor="edit-field-unique">Solo Valores Únicos</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditFieldDialog(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={() => selectedField && updateField(selectedField.id, selectedField)}
+              disabled={!selectedField?.name?.trim()}
+            >
+              Actualizar Campo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
