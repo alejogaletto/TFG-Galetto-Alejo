@@ -65,7 +65,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Mock database data - in a real app, this would come from an API call
-const databaseTemplates = {
+const databaseTemplates: Record<string, any> = {
   customers: {
     id: "customers",
     name: "Customers",
@@ -175,11 +175,11 @@ export default function FormBuilderPage() {
   const dropAreaRef = useRef(null)
 
   // Database connection state
-  const [connectedDatabase, setConnectedDatabase] = useState(null)
-  const [selectedTable, setSelectedTable] = useState(null)
+  const [connectedDatabase, setConnectedDatabase] = useState<string | null>(null)
+  const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [showDatabaseConnect, setShowDatabaseConnect] = useState(false)
   const [autoMapFields, setAutoMapFields] = useState(true)
-  const [fieldMappings, setFieldMappings] = useState({})
+  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({})
 
   // Integration options
   const [integrations, setIntegrations] = useState({
@@ -189,10 +189,10 @@ export default function FormBuilderPage() {
   })
 
   // Default form elements
-  const [formElements, setFormElements] = useState([])
+  const [formElements, setFormElements] = useState<any[]>([])
 
   // Template definitions
-  const templates = {
+  const templates: Record<string, any[]> = {
     blank: [],
     contact: [
       {
@@ -327,56 +327,105 @@ export default function FormBuilderPage() {
 
   // Initialize form based on template when component mounts
   useEffect(() => {
-    try {
-      if (formId === "new") {
-        // New form - no need to load anything
-        return
-      }
-
-      // In a real app, we would fetch the form data from the API here
-      const mockForms = {
-        "1": {
-          id: "1",
-          title: "Comentarios de Cliente",
-          description: "Valoramos tus comentarios",
-          elements: templates.feedback,
-          connectedDatabase: "customers",
-          connectedTable: "Customers",
-        },
-        "2": {
-          id: "2",
-          title: "Formulario de Contacto",
-          description: "Ponte en contacto con nuestro equipo",
-          elements: templates.contact,
-          connectedDatabase: "customers",
-          connectedTable: "Customers",
-        },
-      }
-
-      // If we have form data for this ID, load it
-      if (mockForms[formId]) {
-        const formData = mockForms[formId]
-        setFormTitle(formData.title)
-        setFormDescription(formData.description)
-        setFormElements(formData.elements)
-
-        if (formData.connectedDatabase) {
-          setConnectedDatabase(formData.connectedDatabase)
-          setSelectedTable(formData.connectedTable)
-
-          // Create field mappings based on the dbField property of form elements
-          const mappings = {}
-          formData.elements.forEach((element) => {
-            if (element.dbField) {
-              mappings[element.id] = element.dbField
-            }
-          })
-          setFieldMappings(mappings)
+    const fetchFormData = async () => {
+      try {
+        if (formId === "new") {
+          // New form - no need to load anything
+          setIsLoading(false)
+          return
         }
+
+        // Fetch the actual form data from the API
+        const response = await fetch(`/api/forms/${formId}`)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
+        const formData = await response.json()
+        
+        // Set form title and description
+        setFormTitle(formData.name || "Nuevo Formulario")
+        setFormDescription(formData.description || "Recopila información de tus clientes")
+        
+        // Check if the form has a template configuration
+        if (formData.configs && formData.configs.template) {
+          const templateId = formData.configs.template as keyof typeof templates
+          
+          // Apply the template if it exists
+          if (templates[templateId]) {
+            setFormElements(templates[templateId])
+            console.log(`Applied template: ${templateId}`, templates[templateId])
+          } else {
+            console.warn(`Template ${templateId} not found, starting with blank form`)
+            setFormElements([])
+          }
+          
+          // Set database connection if configured
+          if (formData.configs.database) {
+            const dbKey = formData.configs.database as keyof typeof databaseTemplates
+            setConnectedDatabase(dbKey)
+            // Try to find a suitable table for the database
+            const db = databaseTemplates[dbKey]
+            if (db && db.tables.length > 0) {
+              setSelectedTable(db.tables[0].name)
+            }
+          }
+          
+          // Set other configurations
+          if (formData.configs.enableNotifications !== undefined) {
+            // Handle notifications if needed
+          }
+          
+          if (formData.configs.enableWorkflow !== undefined) {
+            // Handle workflow if needed
+          }
+          
+          if (formData.configs.enableCaptcha !== undefined) {
+            // Handle captcha if needed
+          }
+          
+          if (formData.configs.googleSheets !== undefined) {
+            setIntegrations(prev => ({ ...prev, googleSheets: !!formData.configs.googleSheets }))
+          }
+          
+          if (formData.configs.googleDocs !== undefined) {
+            setIntegrations(prev => ({ ...prev, googleDocs: !!formData.configs.googleDocs }))
+          }
+        } else {
+          // No template specified, start with blank form
+          console.log("No template specified, starting with blank form")
+          setFormElements([])
+        }
+        
+        // If we have form fields from the database, load them instead of template
+        if (formData.fields && formData.fields.length > 0) {
+          // Convert FormField objects to form elements
+          const loadedElements = formData.fields.map((field: any, index: number) => ({
+            id: field.id || index + 1,
+            type: field.type || "text",
+            label: field.label || `Campo ${index + 1}`,
+            placeholder: field.configs?.placeholder || "",
+            required: field.configs?.required || false,
+            helpText: field.configs?.helpText || "",
+            options: field.configs?.options || [],
+            rows: field.configs?.rows || 3,
+            dbField: field.configs?.dbField || null,
+          }))
+          
+          setFormElements(loadedElements)
+          console.log("Loaded form fields from database:", loadedElements)
+        }
+        
+      } catch (error) {
+        console.error("Error fetching form data:", error)
+        // Fallback to blank form
+        setFormElements([])
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      console.error("Error initializing form:", error)
     }
+
+    fetchFormData()
   }, [formId])
 
   // Add a loading state to handle initial rendering
@@ -412,15 +461,15 @@ export default function FormBuilderPage() {
     // Create field mappings based on field types if autoMapFields is enabled
     if (autoMapFields) {
       const db = databaseTemplates[connectedDatabase]
-      const tableData = db.tables.find((t) => t.name === selectedTable)
+      const tableData = db.tables.find((t: any) => t.name === selectedTable)
 
       if (tableData && tableData.fields) {
-        const newMappings = {}
+        const newMappings: Record<string, string> = {}
 
         // Try to automatically map form fields to database fields
         formElements.forEach((element) => {
           // Find a matching database field based on type and name similarity
-          const matchingField = tableData.fields.find((field) => {
+          const matchingField = tableData.fields.find((field: any) => {
             // Skip ID fields
             if (field.type === "id") return false
 
@@ -459,29 +508,29 @@ export default function FormBuilderPage() {
     setShowDatabaseConnect(false)
   }
 
-  const handleDragStart = (e, type) => {
+  const handleDragStart = (e: any, type: any) => {
     setIsDragging(true)
     setDraggedElement(type)
   }
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: any) => {
     e.preventDefault()
     if (dropAreaRef.current) {
-      dropAreaRef.current.classList.add("bg-muted")
+      (dropAreaRef.current as any).classList.add("bg-muted")
     }
   }
 
   const handleDragLeave = () => {
     if (dropAreaRef.current) {
-      dropAreaRef.current.classList.remove("bg-muted")
+      (dropAreaRef.current as any).classList.remove("bg-muted")
     }
   }
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: any) => {
     e.preventDefault()
     setIsDragging(false)
     if (dropAreaRef.current) {
-      dropAreaRef.current.classList.remove("bg-muted")
+      (dropAreaRef.current as any).classList.remove("bg-muted")
     }
 
     if (draggedElement) {
@@ -489,10 +538,10 @@ export default function FormBuilderPage() {
     }
   }
 
-  const addFormElement = (type) => {
+  const addFormElement = (type: any) => {
     const newId = formElements.length > 0 ? Math.max(...formElements.map((el) => el.id)) + 1 : 1
 
-    const newElement = {
+    const newElement: any = {
       id: newId,
       type,
       label: `Nuevo Campo de ${type.charAt(0).toUpperCase() + type.slice(1)}`,
@@ -514,7 +563,7 @@ export default function FormBuilderPage() {
     setShowWelcome(false)
   }
 
-  const removeFormElement = (id) => {
+  const removeFormElement = (id: any) => {
     setFormElements(formElements.filter((element) => element.id !== id))
     setShowFieldSettings(null)
 
@@ -524,11 +573,11 @@ export default function FormBuilderPage() {
     setFieldMappings(newMappings)
   }
 
-  const updateFormElement = (id, updates) => {
+  const updateFormElement = (id: any, updates: any) => {
     setFormElements(formElements.map((element) => (element.id === id ? { ...element, ...updates } : element)))
   }
 
-  const moveFormElement = (id, direction) => {
+  const moveFormElement = (id: any, direction: any) => {
     const index = formElements.findIndex((element) => element.id === id)
     if ((direction === "up" && index === 0) || (direction === "down" && index === formElements.length - 1)) {
       return
@@ -543,7 +592,7 @@ export default function FormBuilderPage() {
     setFormElements(newElements)
   }
 
-  const duplicateFormElement = (id) => {
+  const duplicateFormElement = (id: any) => {
     const element = formElements.find((element) => element.id === id)
     if (!element) return
 
@@ -553,7 +602,7 @@ export default function FormBuilderPage() {
     setFormElements([...formElements, newElement])
   }
 
-  const renderFormElement = (element) => {
+  const renderFormElement = (element: any) => {
     if (!element || !element.type) {
       return <div className="p-2 text-muted-foreground">Invalid field configuration</div>
     }
@@ -587,7 +636,7 @@ export default function FormBuilderPage() {
                 <SelectValue placeholder={element.placeholder || "Selecciona una opción"} />
               </SelectTrigger>
               <SelectContent>
-                {(element.options || ["Opción 1", "Opción 2", "Opción 3"]).map((option, i) => (
+                {(element.options || ["Opción 1", "Opción 2", "Opción 3"]).map((option: any, i: number) => (
                   <SelectItem key={i} value={String(option).toLowerCase().replace(/\s+/g, "-") || `option-${i}`}>
                     {option}
                   </SelectItem>
@@ -604,7 +653,7 @@ export default function FormBuilderPage() {
         case "radio":
           return (
             <RadioGroup defaultValue="option-1">
-              {(element.options || ["Opción 1", "Opción 2", "Opción 3"]).map((option, i) => (
+              {(element.options || ["Opción 1", "Opción 2", "Opción 3"]).map((option: any, i: number) => (
                 <div key={i} className="flex items-center space-x-2">
                   <RadioGroupItem value={`option-${i + 1}`} id={`option-${i + 1}-${element.id}`} />
                   <Label htmlFor={`option-${i + 1}-${element.id}`}>{option}</Label>
@@ -623,7 +672,7 @@ export default function FormBuilderPage() {
     }
   }
 
-  const renderDatabaseTag = (element) => {
+  const renderDatabaseTag = (element: any) => {
     if (!connectedDatabase || !selectedTable || !fieldMappings[element.id]) return null
 
     const mappedField = fieldMappings[element.id]
@@ -636,7 +685,7 @@ export default function FormBuilderPage() {
     )
   }
 
-  const renderFieldSettings = (element) => {
+  const renderFieldSettings = (element: any) => {
     if (!element) return null
 
     return (
@@ -696,7 +745,7 @@ export default function FormBuilderPage() {
           <div className="space-y-2">
             <Label>Opciones</Label>
             <div className="space-y-2">
-              {element.options.map((option, i) => (
+              {element.options.map((option: any, i: number) => (
                 <div key={i} className="flex items-center space-x-2">
                   <Input
                     value={option}
@@ -710,7 +759,7 @@ export default function FormBuilderPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => {
-                      const newOptions = element.options.filter((_, index) => index !== i)
+                      const newOptions = element.options.filter((_: any, index: any) => index !== i)
                       updateFormElement(element.id, { options: newOptions })
                     }}
                   >
@@ -775,9 +824,9 @@ export default function FormBuilderPage() {
               <SelectContent>
                 <SelectItem value="not-mapped">Sin mapear</SelectItem>
                 {databaseTemplates[connectedDatabase]?.tables
-                  .find((t) => t.name === selectedTable)
-                  ?.fields.filter((f) => f.type !== "id") // Filter out ID fields
-                  .map((field) => (
+                  .find((t: any) => t.name === selectedTable)
+                  ?.fields.filter((f: any) => f.type !== "id") // Filter out ID fields
+                  .map((field: any) => (
                     <SelectItem key={field.id} value={field.name}>
                       {field.name} ({field.type})
                     </SelectItem>
@@ -1600,7 +1649,7 @@ export default function FormBuilderPage() {
                         <SelectValue placeholder="Selecciona una tabla" />
                       </SelectTrigger>
                       <SelectContent>
-                        {databaseTemplates[connectedDatabase]?.tables.map((table) => (
+                        {databaseTemplates[connectedDatabase]?.tables.map((table: any) => (
                           <SelectItem key={table.id} value={table.name}>
                             {table.name}
                           </SelectItem>
@@ -1661,9 +1710,9 @@ export default function FormBuilderPage() {
                                     <SelectContent>
                                       <SelectItem value="not-mapped">Sin mapear</SelectItem>
                                       {databaseTemplates[connectedDatabase]?.tables
-                                        .find((t) => t.name === selectedTable)
-                                        ?.fields.filter((f) => f.type !== "id")
-                                        .map((field) => (
+                                        .find((t: any) => t.name === selectedTable)
+                                        ?.fields.filter((f: any) => f.type !== "id")
+                                        .map((field: any) => (
                                           <SelectItem key={field.id} value={field.name}>
                                             {field.name} ({field.type})
                                           </SelectItem>
@@ -1680,7 +1729,7 @@ export default function FormBuilderPage() {
 
                     <div className="bg-blue-50 rounded-md p-3 mt-2">
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                        <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5"/>
                         <div>
                           <p className="text-sm font-medium text-blue-700">Cómo se guardan los datos del formulario</p>
                           <p className="text-sm text-blue-600">
