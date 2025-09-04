@@ -54,6 +54,7 @@ export default function FormsPage() {
   const [forms, setForms] = useState<FormType[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [availableDatabases, setAvailableDatabases] = useState<Array<{ id: number; name: string }>>([])
 
   useEffect(() => {
     const fetchForms = async () => {
@@ -75,6 +76,22 @@ export default function FormsPage() {
     };
     fetchForms();
   }, []);
+
+  // Fetch existing databases for the dropdown
+  useEffect(() => {
+    const fetchDatabases = async () => {
+      try {
+        const res = await fetch('/api/virtual-schemas')
+        if (!res.ok) return
+        const data = await res.json()
+        const list = (Array.isArray(data) ? data : []).map((d: any) => ({ id: d.id, name: d.name }))
+        setAvailableDatabases(list)
+      } catch (e) {
+        // silent fail for dropdown
+      }
+    }
+    fetchDatabases()
+  }, [])
 
   const [showNewForm, setShowNewForm] = useState(false)
   const [newForm, setNewForm] = useState({
@@ -455,12 +472,16 @@ export default function FormsPage() {
                         <div className="flex items-center justify-between">
                           <Label>Conexión a Base de Datos</Label>
                           <Switch
-                            defaultChecked
                             id="db-connection"
-                            checked={true}
-                            onCheckedChange={(checked) =>
-                              setNewForm({ ...newForm, database: checked ? "customers" : "" })
-                            }
+                            checked={!!newForm.database}
+                            onCheckedChange={(checked) => {
+                              setNewForm({
+                                ...newForm,
+                                database: checked
+                                  ? (newForm.database || (availableDatabases[0]?.name || "customers"))
+                                  : "",
+                              })
+                            }}
                           />
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -470,7 +491,7 @@ export default function FormsPage() {
                         <div className="mt-4">
                           <Label htmlFor="database-select">Seleccionar Base de Datos</Label>
                           <Select
-                            defaultValue="customers"
+                            defaultValue={newForm.database}
                             value={newForm.database}
                             onValueChange={(value: string) => setNewForm({ ...newForm, database: value })}
                             disabled={!newForm.database}
@@ -479,11 +500,11 @@ export default function FormsPage() {
                               <SelectValue placeholder="Seleccionar base de datos" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="customers">Clientes</SelectItem>
-                              <SelectItem value="employees">Empleados</SelectItem>
-                              <SelectItem value="projects">Proyectos</SelectItem>
-                              <SelectItem value="orders">Pedidos</SelectItem>
-                              <SelectItem value="products">Productos</SelectItem>
+                              {availableDatabases.map((db) => (
+                                <SelectItem key={db.id} value={db.name}>
+                                  {db.name}
+                                </SelectItem>
+                              ))}
                               <SelectItem value="new">Crear Nueva Base de Datos</SelectItem>
                             </SelectContent>
                           </Select>
