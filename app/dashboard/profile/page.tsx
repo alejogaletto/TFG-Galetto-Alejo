@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { User, Key, Shield, Bell } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -38,12 +39,42 @@ export default function ProfilePage() {
     marketing: false,
   })
 
+  const [googleConfig, setGoogleConfig] = useState<{
+    connected: boolean
+    method: "oauth" | "service_account"
+    clientEmail: string
+    projectId: string
+  }>({ connected: false, method: "oauth", clientEmail: "", projectId: "" })
+
   const router = useRouter()
   const { toast } = useToast()
 
+  const searchParams = useSearchParams()
+
+  const [activeTab, setActiveTab] = useState<string>("general")
+
   useEffect(() => {
     loadProfile()
+    const tab = searchParams.get("tab")
+    if (tab) setActiveTab(tab)
   }, [])
+
+  useEffect(() => {
+    // Reflect OAuth cookie connection status
+    const checkStatus = async () => {
+      try {
+        const res = await fetch("/api/auth/google/status", { cache: "no-store" })
+        if (!res.ok) return
+        const data = await res.json()
+        if (typeof data.connected === "boolean") {
+          setGoogleConfig((p) => ({ ...p, connected: data.connected }))
+        }
+      } catch {}
+    }
+    const connectedFlag = searchParams.get("connected")
+    if (connectedFlag === "1") setGoogleConfig((p) => ({ ...p, connected: true }))
+    checkStatus()
+  }, [activeTab])
 
   const loadProfile = async () => {
     try {
@@ -77,6 +108,12 @@ export default function ProfilePage() {
               push: false,
               marketing: false,
             },
+            google: {
+              connected: false,
+              method: "oauth",
+              clientEmail: "",
+              projectId: "",
+            },
           },
         }
         // Guardar perfil por defecto
@@ -90,6 +127,11 @@ export default function ProfilePage() {
       // Cargar preferencias de notificaciones
       if (userProfile.configs?.notifications) {
         setNotifications(userProfile.configs.notifications)
+      }
+
+      // Cargar config de Google
+      if (userProfile.configs?.google) {
+        setGoogleConfig(userProfile.configs.google)
       }
     } catch (error: any) {
       console.error("Error loading profile:", error)
@@ -116,6 +158,7 @@ export default function ProfilePage() {
         configs: {
           ...profile.configs,
           notifications,
+          google: googleConfig,
         },
       }
 
@@ -240,7 +283,7 @@ export default function ProfilePage() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
-        <Button variant="ghost" onClick={() => router.back()}>
+        <Button variant="ghost" onClick={() => router.push("/dashboard") }>
           ← Volver
         </Button>
         <h1 className="font-semibold text-lg">Mi Perfil</h1>
@@ -274,13 +317,49 @@ export default function ProfilePage() {
           </Card>
 
           {/* Profile Tabs */}
-          <Tabs defaultValue="general" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="security">Seguridad</TabsTrigger>
               <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
+              <TabsTrigger value="google">Google</TabsTrigger>
               <TabsTrigger value="account">Cuenta</TabsTrigger>
             </TabsList>
+            <TabsContent value="google" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Credenciales de Google</CardTitle>
+                  <CardDescription>Conecta tu cuenta de Google para usar Hojas de Cálculo.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Conecta con Google para conceder permisos a Hojas de Cálculo automáticamente.
+                    </p>
+                    <Button asChild disabled={googleConfig.connected}>
+                      <Link href={googleConfig.connected ? "#" : "/api/auth/google"}>
+                        {googleConfig.connected ? "Conectado" : "Conectar con Google"}
+                      </Link>
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Se solicitará el alcance necesario para crear y editar hojas de cálculo.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="google-connected"
+                      checked={googleConfig.connected}
+                      onCheckedChange={(checked) => setGoogleConfig((p) => ({ ...p, connected: !!checked }))}
+                    />
+                    <Label htmlFor="google-connected">Marcar como conectado</Label>
+                  </div>
+                  <Button onClick={updateProfile} disabled={saving}>
+                    {saving ? "Guardando..." : "Guardar credenciales"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="general" className="space-y-4">
               <Card>

@@ -55,6 +55,7 @@ export default function FormsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [availableDatabases, setAvailableDatabases] = useState<Array<{ id: number; name: string }>>([])
+  const [googleConnected, setGoogleConnected] = useState(false)
 
   useEffect(() => {
     const fetchForms = async () => {
@@ -93,6 +94,19 @@ export default function FormsPage() {
     fetchDatabases()
   }, [])
 
+  // Check Google OAuth connection status (cookies)
+  useEffect(() => {
+    const checkGoogle = async () => {
+      try {
+        const res = await fetch('/api/auth/google/status', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (typeof data.connected === 'boolean') setGoogleConnected(data.connected)
+      } catch {}
+    }
+    checkGoogle()
+  }, [])
+
   const [showNewForm, setShowNewForm] = useState(false)
   const [newForm, setNewForm] = useState({
     name: "",
@@ -104,6 +118,8 @@ export default function FormsPage() {
     enableCaptcha: true,
     googleSheets: false,
     googleDocs: false,
+    googleSheetsSpreadsheetId: "",
+    googleSheetsSheetName: "",
   })
 
   const formTemplates = [
@@ -168,6 +184,8 @@ export default function FormsPage() {
         enableCaptcha: true,
         googleSheets: false,
         googleDocs: false,
+        googleSheetsSpreadsheetId: "",
+        googleSheetsSheetName: "",
       });
       
       // Close the dialog
@@ -332,7 +350,7 @@ export default function FormsPage() {
                   Nuevo Formulario
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[700px]">
+              <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Crear Nuevo Formulario</DialogTitle>
                   <DialogDescription>
@@ -533,6 +551,61 @@ export default function FormsPage() {
                             </p>
                           </div>
                         </div>
+
+                        {newForm.googleSheets && (
+                          <div className="grid gap-2 mt-3 p-3 border rounded-md">
+                            <div className="grid gap-1">
+                              <Label htmlFor="gs-spreadsheet">Spreadsheet ID</Label>
+                              <Input
+                                id="gs-spreadsheet"
+                                placeholder="1AbCDEFgh..."
+                                value={(newForm as any).googleSheetsSpreadsheetId || ""}
+                                onChange={(e) => setNewForm({ ...newForm, googleSheetsSpreadsheetId: e.target.value as any })}
+                              />
+                            </div>
+                            <div className="grid gap-1">
+                              <Label htmlFor="gs-sheet">Sheet name</Label>
+                              <Input
+                                id="gs-sheet"
+                                placeholder="Sheet1"
+                                value={(newForm as any).googleSheetsSheetName || ""}
+                                onChange={(e) => setNewForm({ ...newForm, googleSheetsSheetName: e.target.value as any })}
+                              />
+                            </div>
+                            <div>
+                              <Button
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch('/api/google/sheets/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newForm.name || 'Formulario' }) })
+                                    if (!res.ok) {
+                                      console.error('Failed to create sheet')
+                                      return
+                                    }
+                                    const data = await res.json()
+                                    setNewForm({
+                                      ...newForm,
+                                      googleSheetsSpreadsheetId: data.spreadsheetId,
+                                      googleSheetsSheetName: data.sheetName,
+                                    } as any)
+                                  } catch (e) {
+                                    console.error(e)
+                                  }
+                                }}
+                              >
+                                Crear hoja de Google
+                              </Button>
+                            </div>
+                            {!googleConnected && (
+                              <p className="text-xs text-muted-foreground">
+                                Puedes configurar tus credenciales en tu{" "}
+                                <Link href="/dashboard/profile?tab=google" className="underline">
+                                  perfil
+                                </Link>.
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         <div className="flex items-center space-x-2 mt-4">
                           <Checkbox

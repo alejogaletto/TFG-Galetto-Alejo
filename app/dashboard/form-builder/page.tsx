@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
 import { v4 as uuidv4 } from "uuid"
 import {
   Navbar,
@@ -18,6 +18,7 @@ import {
   Textarea,
   Checkbox,
   Radio,
+  RadioGroup,
   SelectItem,
   Select,
 } from "@nextui-org/react"
@@ -27,15 +28,25 @@ import { IoIosClose } from "react-icons/io"
 import { useDisclosure } from "@nextui-org/react"
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/react"
 
-const initialFormElements = [
+type FormOption = { id: string; text: string }
+type FormElement = {
+  id: string
+  type: string
+  label: string
+  placeholder: string
+  required?: boolean
+  options?: FormOption[]
+}
+
+const initialFormElements: FormElement[] = [
   { id: uuidv4(), type: "Text", label: "Nombre", placeholder: "Tu nombre" },
   { id: uuidv4(), type: "Email", label: "Email", placeholder: "Tu email" },
   { id: uuidv4(), type: "Textarea", label: "Mensaje", placeholder: "Tu mensaje" },
 ]
 
 const FormBuilder = () => {
-  const [formElements, setFormElements] = useState(initialFormElements)
-  const [selectedElement, setSelectedElement] = useState(null)
+  const [formElements, setFormElements] = useState<FormElement[]>(initialFormElements)
+  const [selectedElement, setSelectedElement] = useState<FormElement | null>(null)
   const [formName, setFormName] = useState("Untitled Form")
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false)
   const [isDatabaseConnected, setIsDatabaseConnected] = useState(false)
@@ -61,7 +72,14 @@ const FormBuilder = () => {
     { label: "Table 2", value: "table2" },
   ])
 
-  const [fieldSettings, setFieldSettings] = useState({
+  const [fieldSettings, setFieldSettings] = useState<{
+    label: string
+    placeholder: string
+    helpText: string
+    required: boolean
+    options: FormOption[]
+    rows?: number
+  }>({
     label: "",
     placeholder: "",
     helpText: "",
@@ -93,12 +111,12 @@ const FormBuilder = () => {
     onClose()
   }
 
-  const addFormElement = (type) => {
+  const addFormElement = (type: any) => {
     const newElement = { id: uuidv4(), type: type, label: type, placeholder: "" }
     setFormElements([...formElements, newElement])
   }
 
-  const onDragEnd = (result) => {
+  const onDragEnd = (result: any) => {
     if (!result.destination) {
       return
     }
@@ -110,7 +128,7 @@ const FormBuilder = () => {
     setFormElements(items)
   }
 
-  const handleElementClick = (element) => {
+  const handleElementClick = (element: any) => {
     setSelectedElement(element)
     setFieldSettings({
       label: element.label || "",
@@ -121,17 +139,18 @@ const FormBuilder = () => {
     })
   }
 
-  const updateFormElement = (id, updatedValues) => {
+  const updateFormElement = (id: any, updatedValues: any) => {
     setFormElements((prevElements) =>
       prevElements.map((element) => (element.id === id ? { ...element, ...updatedValues } : element)),
     )
     setSelectedElement((prev) => ({ ...prev, ...updatedValues }))
   }
 
-  const handleFieldSettingsChange = (e) => {
+  const handleFieldSettingsChange = (e: any) => {
+    if (!selectedElement) return
     const { name, value, type, checked } = e.target
 
-    const updatedValue = type === "checkbox" ? checked : value
+    const updatedValue = type === "checkbox" ? checked : name === "rows" ? Number(value) : value
 
     setFieldSettings((prevSettings) => ({
       ...prevSettings,
@@ -142,6 +161,7 @@ const FormBuilder = () => {
   }
 
   const handleAddOption = () => {
+    if (!selectedElement) return
     setFieldSettings((prevSettings) => ({
       ...prevSettings,
       options: [...prevSettings.options, { id: uuidv4(), text: "" }],
@@ -151,7 +171,8 @@ const FormBuilder = () => {
     })
   }
 
-  const handleOptionChange = (optionId, text) => {
+  const handleOptionChange = (optionId: any, text: any) => {
+    if (!selectedElement) return
     const updatedOptions = fieldSettings.options.map((option) =>
       option.id === optionId ? { ...option, text } : option,
     )
@@ -162,7 +183,8 @@ const FormBuilder = () => {
     updateFormElement(selectedElement.id, { options: updatedOptions })
   }
 
-  const handleDeleteOption = (optionId) => {
+  const handleDeleteOption = (optionId: any) => {
+    if (!selectedElement) return
     const updatedOptions = fieldSettings.options.filter((option) => option.id !== optionId)
     setFieldSettings((prevSettings) => ({
       ...prevSettings,
@@ -171,12 +193,12 @@ const FormBuilder = () => {
     updateFormElement(selectedElement.id, { options: updatedOptions })
   }
 
-  const deleteFormElement = (id) => {
+  const deleteFormElement = (id: string) => {
     setFormElements((prevElements) => prevElements.filter((element) => element.id !== id))
     setSelectedElement(null)
   }
 
-  const duplicateFormElement = (id) => {
+  const duplicateFormElement = (id: string) => {
     const elementToDuplicate = formElements.find((element) => element.id === id)
     if (elementToDuplicate) {
       const newElement = { ...elementToDuplicate, id: uuidv4() }
@@ -184,7 +206,7 @@ const FormBuilder = () => {
     }
   }
 
-  const toggleRequired = (id) => {
+  const toggleRequired = (id: string) => {
     const element = formElements.find((element) => element.id === id)
     if (element) {
       const updatedRequired = !element.required
@@ -475,10 +497,10 @@ const FormBuilder = () => {
                                   </Select>
                                 )}
                                 {element.type === "Botón de Radio" && (
-                                  <Radio.Group isDisabled label={element.label}>
+                                  <RadioGroup isDisabled label={element.label}>
                                     <Radio value="option1">Opción 1</Radio>
                                     <Radio value="option2">Opción 2</Radio>
-                                  </Radio.Group>
+                                  </RadioGroup>
                                 )}
                                 {element.type === "Fecha" && <Input type="date" label={element.label} readOnly />}
                                 {element.type === "Nombre" && (
@@ -551,7 +573,7 @@ const FormBuilder = () => {
                   type="number"
                   label="Filas"
                   name="rows"
-                  value={fieldSettings.rows}
+                  value={String(fieldSettings.rows ?? "")}
                   onChange={handleFieldSettingsChange}
                 />
               )}
@@ -630,7 +652,7 @@ const FormBuilder = () => {
                   placeholder="Selecciona una base de datos"
                   items={databaseOptions}
                   selectedKeys={[connectedDatabase]}
-                  onSelectionChange={(keys) => setConnectedDatabase(keys.currentKey)}
+                  onSelectionChange={(keys) => setConnectedDatabase((keys as any).currentKey ?? "")}
                 >
                   {(item) => <SelectItem key={item.value}>{item.label}</SelectItem>}
                 </Select>
@@ -640,7 +662,7 @@ const FormBuilder = () => {
                   placeholder="Selecciona una tabla"
                   items={tableOptions}
                   selectedKeys={[connectedTable]}
-                  onSelectionChange={(keys) => setConnectedTable(keys.currentKey)}
+                  onSelectionChange={(keys) => setConnectedTable((keys as any).currentKey ?? "")}
                 >
                   {(item) => <SelectItem key={item.value}>{item.label}</SelectItem>}
                 </Select>

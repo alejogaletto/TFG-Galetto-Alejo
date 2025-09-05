@@ -32,13 +32,24 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .single();
 
+    let storageResponse
     if (dataConnection && !connectionError) {
-      // Store in BusinessData with field mapping
-      return await storeInBusinessData(form_id, form_data, dataConnection.virtual_table_schema_id);
+      storageResponse = await storeInBusinessData(form_id, form_data, dataConnection.virtual_table_schema_id)
     } else {
-      // Store in generic FormSubmission table
-      return await storeInFormSubmission(form_id, form_data);
+      storageResponse = await storeInFormSubmission(form_id, form_data)
     }
+
+    // Google Sheets integration (best-effort, non-blocking)
+    try {
+      if (form.configs?.googleSheets && form.configs?.googleSheetsConfig?.spreadsheetId && form.configs?.googleSheetsConfig?.sheetName) {
+        await appendToGoogleSheet(form.user_id, form.configs.googleSheetsConfig.spreadsheetId, form.configs.googleSheetsConfig.sheetName, form_data)
+      }
+    } catch (gsErr) {
+      console.error('Google Sheets append failed:', gsErr)
+      // do not fail the main storage
+    }
+
+    return storageResponse
 
   } catch (error: any) {
     console.error('Error processing form submission:', error);
@@ -177,5 +188,37 @@ async function storeInFormSubmission(form_id: number, form_data: any) {
   } catch (error: any) {
     console.error('Error storing in FormSubmission:', error);
     return NextResponse.json({ error: 'Failed to store submission' }, { status: 500 });
+  }
+}
+
+// Append to Google Sheets using user's service account credentials
+async function appendToGoogleSheet(user_id: number, spreadsheetId: string, sheetName: string, form_data: any) {
+  try {
+    // Load user to get per-user credentials
+    const { data: user, error } = await supabase.from('User').select('configs').eq('id', user_id).single()
+    if (error || !user) return
+    const email = user.configs?.google?.serviceAccountEmail
+    const pem = user.configs?.google?.serviceAccountKey
+    if (!email || !pem) return
+
+    const { google } = await import('googleapis')
+    const jwt = new google.auth.JWT({
+      email,
+      key: pem,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    })
+    const sheets = google.sheets({ version: 'v4', auth: jwt })
+
+    const headers = Object.keys(form_data)
+    const values = [headers.map((h) => form_data[h])]
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values }
+    })
+  } catch (e) {
+    console.error('appendToGoogleSheet error:', e)
   }
 }
