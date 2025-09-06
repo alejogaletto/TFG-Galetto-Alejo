@@ -624,10 +624,14 @@ export default function FormsPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-2 mt-4">
+                        <div
+                          className="flex items-center space-x-2 mt-4 opacity-50 cursor-not-allowed"
+                          aria-disabled
+                          title="Próximamente"
+                        >
                           <Checkbox id="webhook" checked={false} disabled />
-                          <div className="grid gap-1.5 leading-none">
-                            <Label htmlFor="webhook" className="text-sm font-medium flex items-center">
+                          <div className="grid gap-1.5 leading-none border border-dashed rounded p-2 bg-muted w-full">
+                            <Label htmlFor="webhook" className="text-sm font-medium flex items-center text-muted-foreground">
                               <Webhook className="h-4 w-4 mr-2 text-purple-600" />
                               Webhook (Próximamente)
                             </Label>
