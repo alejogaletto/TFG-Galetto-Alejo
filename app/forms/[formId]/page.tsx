@@ -163,7 +163,29 @@ export default function FormView({ params }: { params: { formId: string } }) {
     const error = errors[`field_${id}`]
     const label = fld.label
 
-    switch (fld.type) {
+    // Normalize type to handle different capitalizations and synonyms from builder
+    const rawType = String(fld.type || "").toLowerCase()
+    const typeMap: Record<string, string> = {
+      texto: "text",
+      text: "text",
+      input: "text",
+      email: "email",
+      correo: "email",
+      phone: "phone",
+      telefono: "phone",
+      "teléfono": "phone",
+      textarea: "textarea",
+      area: "textarea",
+      select: "select",
+      dropdown: "select",
+      checkbox: "checkbox",
+      "casilla de verificación": "checkbox",
+      radio: "radio",
+      "botón de radio": "radio",
+    }
+    const normalizedType = typeMap[rawType] || rawType
+
+    switch (normalizedType) {
       case "text":
       case "email":
       case "phone":
