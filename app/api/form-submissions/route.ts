@@ -42,7 +42,13 @@ export async function POST(req: NextRequest) {
     // Google Sheets integration (best-effort, non-blocking)
     try {
       if (form.configs?.googleSheets && form.configs?.googleSheetsConfig?.spreadsheetId && form.configs?.googleSheetsConfig?.sheetName) {
-        await appendToGoogleSheet(form.user_id, form.configs.googleSheetsConfig.spreadsheetId, form.configs.googleSheetsConfig.sheetName, form_data)
+        await appendToGoogleSheet(
+          form.user_id,
+          form.id,
+          form.configs.googleSheetsConfig.spreadsheetId,
+          form.configs.googleSheetsConfig.sheetName,
+          form_data,
+        )
       }
     } catch (gsErr) {
       console.error('Google Sheets append failed:', gsErr)
@@ -192,7 +198,7 @@ async function storeInFormSubmission(form_id: number, form_data: any) {
 }
 
 // Append to Google Sheets using user's service account credentials
-async function appendToGoogleSheet(user_id: number, spreadsheetId: string, sheetName: string, form_data: any) {
+async function appendToGoogleSheet(user_id: number, form_id: number, spreadsheetId: string, sheetName: string, form_data: any) {
   try {
     // Load user to get per-user credentials
     const { data: user, error } = await supabase.from('User').select('configs').eq('id', user_id).single()
@@ -209,14 +215,43 @@ async function appendToGoogleSheet(user_id: number, spreadsheetId: string, sheet
     })
     const sheets = google.sheets({ version: 'v4', auth: jwt })
 
-    const headers = Object.keys(form_data)
-    const values = [headers.map((h) => form_data[h])]
+    // 1) Build deterministic column order using form fields (labels)
+    const { data: fields, error: fieldsError } = await supabase
+      .from('FormField')
+      .select('id,label,position')
+      .eq('form_id', form_id)
+      .order('position', { ascending: true })
 
+    if (fieldsError || !fields) return
+
+    const orderedFields = fields.map((f: any) => ({ id: f.id, label: f.label || `Field ${f.id}` }))
+    const headerLabels = orderedFields.map((f: any) => f.label)
+    const rowValues = orderedFields.map((f: any) => form_data[f.id] ?? '')
+
+    // 2) Ensure header row exists; if empty sheet, write headers first
+    const getRes = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A1:Z1`,
+      majorDimension: 'ROWS'
+    })
+    const hasHeader = Array.isArray(getRes.data.values) && getRes.data.values.length > 0
+
+    if (!hasHeader) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${sheetName}!A1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [headerLabels] }
+      })
+    }
+
+    // 3) Append the new row in the same column order
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `${sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values }
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [rowValues] }
     })
   } catch (e) {
     console.error('appendToGoogleSheet error:', e)

@@ -133,8 +133,23 @@ export default function FormView({ params }: { params: { formId: string } }) {
     setIsSubmitting(true)
     setShowConnections(true)
     try {
-      // TODO: POST submission to an endpoint (e.g., /api/form-submissions)
-      await new Promise((r) => setTimeout(r, 1200))
+      // Build payload expected by API: keys are raw form_field ids
+      const payload: Record<string, any> = {}
+      fields.forEach((fld) => {
+        payload[fld.id] = formData[`field_${fld.id}`]
+      })
+
+      const res = await fetch('/api/form-submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ form_id: Number(formId), form_data: payload }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || 'No se pudo enviar el formulario')
+      }
+
       setIsSubmitted(true)
     } finally {
       setIsSubmitting(false)
