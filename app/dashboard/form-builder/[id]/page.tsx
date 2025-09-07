@@ -1107,7 +1107,37 @@ export default function FormBuilderPage() {
                   Ver Formulario Público
                 </Link>
               </Button>
-              <Button size="sm">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const payload = {
+                      fields: formElements.map((el, idx) => ({
+                        type: el.type,
+                        label: el.label,
+                        position: idx,
+                        placeholder: el.placeholder,
+                        required: el.required,
+                        helpText: el.helpText,
+                        options: el.options,
+                        rows: el.rows,
+                        dbField: el.dbField,
+                      })),
+                    }
+                    const res = await fetch(`/api/forms/${formId}/publish-fields`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(payload),
+                    })
+                    if (!res.ok) {
+                      console.error('Publish failed')
+                      return
+                    }
+                  } catch (e) {
+                    console.error(e)
+                  }
+                }}
+              >
                 <Save className="mr-2 h-4 w-4" />
                 Guardar
               </Button>
