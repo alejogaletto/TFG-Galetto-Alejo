@@ -341,7 +341,7 @@ export default function WorkflowsPage() {
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
           <div className="flex items-center justify-between">
             <h1 className="font-semibold text-lg md:text-2xl">Flujos de Trabajo</h1>
-            <Button onClick={() => router.push("/dashboard/workflows/new")}>
+            <Button onClick={() => router.push("/dashboard/workflows/create")}>
               <Plus className="mr-2 h-4 w-4" />
               Nuevo Flujo de Trabajo
             </Button>
@@ -477,7 +477,7 @@ export default function WorkflowsPage() {
                         ? "No se encontraron workflows que coincidan con tu búsqueda"
                         : "Crea tu primer workflow para automatizar procesos"}
                     </p>
-                    <Button onClick={() => router.push("/dashboard/workflows/new")}>
+                    <Button onClick={() => router.push("/dashboard/workflows/create")}>
                       <Plus className="mr-2 h-4 w-4" />
                       Crear Primer Workflow
                     </Button>
