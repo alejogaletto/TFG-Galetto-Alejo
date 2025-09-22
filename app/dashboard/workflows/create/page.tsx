@@ -24,6 +24,9 @@ import {
   Pencil,
   Play,
   Zap,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -62,6 +65,8 @@ export default function CreateWorkflowPage() {
   const [connections, setConnections] = useState<{ from: number; to: number }[]>([])
   const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(1)
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const canvasRef = useRef<HTMLDivElement>(null)
 
   const workflowEngine = WorkflowEngine.getInstance()
@@ -80,6 +85,42 @@ export default function CreateWorkflowPage() {
       icon: <FileText className="h-10 w-10 text-primary" />,
       steps: 3,
       complexity: "Principiante",
+      workflowSteps: [
+        {
+          id: Date.now(),
+          type: "trigger",
+          actionId: "form-submission",
+          name: "Envío de Formulario",
+          description: "Se activa cuando se envía un formulario",
+          icon: <FileText className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 50 },
+          config: {},
+        },
+        {
+          id: Date.now() + 1,
+          type: "action",
+          actionId: "update-database",
+          name: "Actualizar Base de Datos",
+          description: "Crea o actualiza registros de base de datos",
+          icon: <Database className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 180 },
+          config: {},
+        },
+        {
+          id: Date.now() + 2,
+          type: "action",
+          actionId: "send-email",
+          name: "Enviar Correo",
+          description: "Envía una notificación por correo",
+          icon: <Mail className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 310 },
+          config: {},
+        },
+      ],
+      connections: [
+        { from: Date.now(), to: Date.now() + 1 },
+        { from: Date.now() + 1, to: Date.now() + 2 },
+      ],
     },
     {
       id: "customer-onboarding",
@@ -88,6 +129,53 @@ export default function CreateWorkflowPage() {
       icon: <Mail className="h-10 w-10 text-primary" />,
       steps: 4,
       complexity: "Intermedio",
+      workflowSteps: [
+        {
+          id: Date.now(),
+          type: "trigger",
+          actionId: "form-submission",
+          name: "Registro de Cliente",
+          description: "Se activa cuando un cliente se registra",
+          icon: <FileText className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 50 },
+          config: {},
+        },
+        {
+          id: Date.now() + 1,
+          type: "action",
+          actionId: "update-database",
+          name: "Crear Perfil de Cliente",
+          description: "Crea el perfil del cliente en la base de datos",
+          icon: <Database className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 180 },
+          config: {},
+        },
+        {
+          id: Date.now() + 2,
+          type: "action",
+          actionId: "send-email",
+          name: "Email de Bienvenida",
+          description: "Envía email de bienvenida al cliente",
+          icon: <Mail className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 310 },
+          config: {},
+        },
+        {
+          id: Date.now() + 3,
+          type: "action",
+          actionId: "delay",
+          name: "Esperar 24 horas",
+          description: "Espera 24 horas antes del siguiente paso",
+          icon: <Clock className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 440 },
+          config: {},
+        },
+      ],
+      connections: [
+        { from: Date.now(), to: Date.now() + 1 },
+        { from: Date.now() + 1, to: Date.now() + 2 },
+        { from: Date.now() + 2, to: Date.now() + 3 },
+      ],
     },
     {
       id: "approval-process",
@@ -96,6 +184,64 @@ export default function CreateWorkflowPage() {
       icon: <Check className="h-10 w-10 text-primary" />,
       steps: 5,
       complexity: "Avanzado",
+      workflowSteps: [
+        {
+          id: Date.now(),
+          type: "trigger",
+          actionId: "manual",
+          name: "Solicitud de Aprobación",
+          description: "Se activa manualmente para solicitar aprobación",
+          icon: <ArrowRight className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 50 },
+          config: {},
+        },
+        {
+          id: Date.now() + 1,
+          type: "action",
+          actionId: "send-email",
+          name: "Notificar Supervisor",
+          description: "Envía notificación al supervisor",
+          icon: <Mail className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 180 },
+          config: {},
+        },
+        {
+          id: Date.now() + 2,
+          type: "action",
+          actionId: "condition",
+          name: "Verificar Aprobación",
+          description: "Verifica si la solicitud fue aprobada",
+          icon: <Check className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 310 },
+          config: {},
+        },
+        {
+          id: Date.now() + 3,
+          type: "action",
+          actionId: "update-database",
+          name: "Actualizar Estado",
+          description: "Actualiza el estado en la base de datos",
+          icon: <Database className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 440 },
+          config: {},
+        },
+        {
+          id: Date.now() + 4,
+          type: "action",
+          actionId: "send-email",
+          name: "Confirmación Final",
+          description: "Envía confirmación del resultado",
+          icon: <Mail className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 570 },
+          config: {},
+        },
+      ],
+      connections: [
+        { from: Date.now(), to: Date.now() + 1 },
+        { from: Date.now() + 1, to: Date.now() + 2 },
+        { from: Date.now() + 2, to: Date.now() + 3 },
+        { from: Date.now() + 3, to: Date.now() + 4 },
+      ],
     },
     {
       id: "scheduled-report",
@@ -104,6 +250,42 @@ export default function CreateWorkflowPage() {
       icon: <Calendar className="h-10 w-10 text-primary" />,
       steps: 3,
       complexity: "Intermedio",
+      workflowSteps: [
+        {
+          id: Date.now(),
+          type: "trigger",
+          actionId: "schedule",
+          name: "Programación Diaria",
+          description: "Se activa diariamente a las 9:00 AM",
+          icon: <Calendar className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 50 },
+          config: { frequency: "daily", time: "09:00" },
+        },
+        {
+          id: Date.now() + 1,
+          type: "action",
+          actionId: "update-database",
+          name: "Generar Reporte",
+          description: "Genera el reporte desde la base de datos",
+          icon: <Database className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 180 },
+          config: {},
+        },
+        {
+          id: Date.now() + 2,
+          type: "action",
+          actionId: "send-email",
+          name: "Enviar Reporte",
+          description: "Envía el reporte por correo",
+          icon: <Mail className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 310 },
+          config: {},
+        },
+      ],
+      connections: [
+        { from: Date.now(), to: Date.now() + 1 },
+        { from: Date.now() + 1, to: Date.now() + 2 },
+      ],
     },
     {
       id: "data-sync",
@@ -112,6 +294,53 @@ export default function CreateWorkflowPage() {
       icon: <Database className="h-10 w-10 text-primary" />,
       steps: 4,
       complexity: "Avanzado",
+      workflowSteps: [
+        {
+          id: Date.now(),
+          type: "trigger",
+          actionId: "database-change",
+          name: "Cambio en Base de Datos",
+          description: "Se activa cuando cambian los datos",
+          icon: <Database className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 50 },
+          config: {},
+        },
+        {
+          id: Date.now() + 1,
+          type: "action",
+          actionId: "condition",
+          name: "Verificar Tipo de Cambio",
+          description: "Verifica qué tipo de cambio ocurrió",
+          icon: <Check className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 180 },
+          config: {},
+        },
+        {
+          id: Date.now() + 2,
+          type: "action",
+          actionId: "update-database",
+          name: "Sincronizar Datos",
+          description: "Sincroniza los datos con la segunda base",
+          icon: <Database className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 310 },
+          config: {},
+        },
+        {
+          id: Date.now() + 3,
+          type: "action",
+          actionId: "notification",
+          name: "Notificar Sincronización",
+          description: "Envía notificación de sincronización exitosa",
+          icon: <AlertCircle className="h-6 w-6 text-primary" />,
+          position: { x: 50, y: 440 },
+          config: {},
+        },
+      ],
+      connections: [
+        { from: Date.now(), to: Date.now() + 1 },
+        { from: Date.now() + 1, to: Date.now() + 2 },
+        { from: Date.now() + 2, to: Date.now() + 3 },
+      ],
     },
     {
       id: "blank",
@@ -120,6 +349,8 @@ export default function CreateWorkflowPage() {
       icon: <Plus className="h-10 w-10 text-primary" />,
       steps: 0,
       complexity: "Cualquiera",
+      workflowSteps: [],
+      connections: [],
     },
   ]
 
@@ -209,8 +440,8 @@ export default function CreateWorkflowPage() {
       type: "integration",
       integrationId: integration.id,
       actionId: action.id,
-      integration,
-      action,
+      integration: integration as any,
+      action: action as any,
     }))
 
     return [...basicActions, ...integrationActions]
@@ -233,6 +464,33 @@ export default function CreateWorkflowPage() {
   ]
 
   const handleNext = () => {
+    if (step === 1 && selectedTemplate) {
+      // Load template steps when moving from step 1 to step 2
+      const template = templates.find(t => t.id === selectedTemplate)
+      if (template && template.workflowSteps) {
+        // Generate unique IDs for template steps to avoid conflicts
+        const templateSteps = template.workflowSteps.map((step, index) => ({
+          ...step,
+          id: Date.now() + index,
+        }))
+        
+        // Create a mapping from old IDs to new IDs
+        const idMapping = new Map()
+        template.workflowSteps.forEach((originalStep, index) => {
+          idMapping.set(originalStep.id, templateSteps[index].id)
+        })
+        
+        // Generate connections with new IDs
+        const templateConnections = template.connections.map(conn => ({
+          from: idMapping.get(conn.from),
+          to: idMapping.get(conn.to),
+        })).filter(conn => conn.from && conn.to) // Filter out invalid connections
+        
+        setWorkflowSteps(templateSteps)
+        setConnections(templateConnections)
+      }
+    }
+    
     if (step === 3) {
       handleSaveWorkflow()
     } else {
@@ -496,6 +754,42 @@ export default function CreateWorkflowPage() {
     setWorkflowSteps(workflowSteps.map((step) => (step.id === id ? { ...step, ...updates } : step)))
   }
 
+  // Canvas zoom and sizing functions
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.1, 2))
+  }
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.1, 0.3))
+  }
+
+  const handleResetZoom = () => {
+    setZoomLevel(1)
+  }
+
+  // Calculate canvas size based on workflow steps
+  const calculateCanvasSize = () => {
+    if (workflowSteps.length === 0) {
+      return { width: 800, height: 600 }
+    }
+
+    // Find the maximum Y position and add padding
+    const maxY = Math.max(...workflowSteps.map(step => step.position.y))
+    const minY = Math.min(...workflowSteps.map(step => step.position.y))
+    
+    // Calculate required height (maxY + step height + padding)
+    const requiredHeight = Math.max(600, maxY + 200)
+    const requiredWidth = Math.max(800, 400) // Ensure minimum width
+
+    return { width: requiredWidth, height: requiredHeight }
+  }
+
+  // Update canvas size when workflow steps change
+  useEffect(() => {
+    const newSize = calculateCanvasSize()
+    setCanvasSize(newSize)
+  }, [workflowSteps])
+
   const renderStepConfig = () => {
     const step = workflowSteps.find((s) => s.id === showStepConfig)
     if (!step) return null
@@ -603,13 +897,13 @@ export default function CreateWorkflowPage() {
               <div className="space-y-4">
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{action.integration.icon}</span>
-                    <span className="font-medium">{action.integration.name}</span>
+                    <span className="text-lg">{(action as any).integration.icon}</span>
+                    <span className="font-medium">{(action as any).integration.name}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{action.action.description}</p>
+                  <p className="text-sm text-muted-foreground">{(action as any).action.description}</p>
                 </div>
 
-                {action.action.inputs.map((input) => (
+                {(action as any).action.inputs.map((input: any) => (
                   <div key={input.id} className="space-y-2">
                     <Label htmlFor={input.id}>
                       {input.name}
@@ -629,7 +923,7 @@ export default function CreateWorkflowPage() {
                           <SelectValue placeholder={`Selecciona ${input.name.toLowerCase()}`} />
                         </SelectTrigger>
                         <SelectContent>
-                          {input.options.map((option) => (
+                          {input.options.map((option: any) => (
                             <SelectItem key={option} value={option}>
                               {option}
                             </SelectItem>
@@ -703,6 +997,22 @@ export default function CreateWorkflowPage() {
         <div className="ml-auto flex items-center gap-2">
           {step === 3 && (
             <>
+              {/* Zoom Controls */}
+              <div className="flex items-center gap-1 border rounded-md">
+                <Button variant="ghost" size="sm" onClick={handleZoomOut} disabled={zoomLevel <= 0.3}>
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleResetZoom}>
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleZoomIn} disabled={zoomLevel >= 2}>
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <div className="px-2 py-1 text-xs text-muted-foreground border-l">
+                  {Math.round(zoomLevel * 100)}%
+                </div>
+              </div>
+              
               <Button variant="outline" size="sm" onClick={handleTestWorkflow}>
                 <Play className="mr-2 h-4 w-4" />
                 Probar
@@ -958,14 +1268,23 @@ export default function CreateWorkflowPage() {
                 </div>
 
                 <div className="flex-1">
-                  <div
-                    ref={canvasRef}
-                    className="relative h-[500px] rounded-lg border bg-muted/20 overflow-hidden"
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onClick={cancelConnection}
-                    onMouseMove={moveConnection}
-                  >
+                  <div className="border rounded-lg bg-muted/20 overflow-auto max-h-[80vh]">
+                    <div
+                      ref={canvasRef}
+                      className="relative bg-white"
+                      style={{
+                        width: `${canvasSize.width}px`,
+                        height: `${canvasSize.height}px`,
+                        transform: `scale(${zoomLevel})`,
+                        transformOrigin: 'top left',
+                        minWidth: '100%',
+                        minHeight: '100%',
+                      }}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onClick={cancelConnection}
+                      onMouseMove={moveConnection}
+                    >
                     {/* Workflow steps */}
                     {workflowSteps.map((step) => (
                       <div
@@ -1030,8 +1349,8 @@ export default function CreateWorkflowPage() {
                                         return (
                                           <div className="rounded-md bg-muted/50 p-1.5">
                                             <div className="flex items-center gap-1 mb-1">
-                                              <span className="text-xs">{action.integration.icon}</span>
-                                              <span className="font-medium">{action.integration.name}</span>
+                                              <span className="text-xs">{(action as any).integration.icon}</span>
+                                              <span className="font-medium">{(action as any).integration.name}</span>
                                             </div>
                                             {Object.entries(step.config)
                                               .slice(0, 2)
@@ -1142,7 +1461,7 @@ export default function CreateWorkflowPage() {
 
                     {/* Empty state */}
                     {workflowSteps.length === 0 && (
-                      <div className="flex h-full items-center justify-center">
+                      <div className="flex h-full items-center justify-center" style={{ height: `${canvasSize.height}px` }}>
                         <div className="text-center">
                           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                             <Plus className="h-6 w-6 text-muted-foreground" />
@@ -1154,6 +1473,7 @@ export default function CreateWorkflowPage() {
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
                 </div>
               </div>

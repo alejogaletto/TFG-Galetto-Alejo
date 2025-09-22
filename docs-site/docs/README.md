@@ -191,7 +191,7 @@ Un sistema visual avanzado para crear flujos de trabajo automatizados con un lie
 
 Si encuentras problemas o tienes preguntas:
 
-1. **Documentación**: Revisar carpeta [`docs/`](./docs/)
+1. **Documentación**: Revisar esta documentación completa
 2. **Constructor de BD**: Ver [Constructor de Base de Datos](database-builder.md)
 3. **Constructor de WF**: Ver [Constructor de Flujos de Trabajo](workflow-builder.md)
 4. **APIs**: Consultar [API Endpoints](api-endpoints.md)
