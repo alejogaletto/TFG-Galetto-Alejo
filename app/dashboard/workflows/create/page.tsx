@@ -15,6 +15,7 @@ import {
   FileText,
   Lightbulb,
   Mail,
+  MessageSquare,
   Plus,
   Save,
   Settings,
@@ -391,9 +392,41 @@ export default function CreateWorkflowPage() {
       {
         id: "send-email",
         name: "Enviar Correo",
-        description: "Envía una notificación por correo",
+        description: "Envía una notificación por correo electrónico",
         icon: <Mail className="h-6 w-6 text-primary" />,
-        category: "Notificaciones",
+        category: "Comunicación",
+        type: "basic",
+      },
+      {
+        id: "send-whatsapp",
+        name: "Enviar WhatsApp",
+        description: "Envía un mensaje por WhatsApp",
+        icon: <MessageSquare className="h-6 w-6 text-primary" />,
+        category: "Comunicación",
+        type: "basic",
+      },
+      {
+        id: "webhook-call",
+        name: "Llamada Webhook",
+        description: "Realiza una llamada HTTP a una URL externa",
+        icon: <Zap className="h-6 w-6 text-primary" />,
+        category: "Integración",
+        type: "basic",
+      },
+      {
+        id: "transform-data",
+        name: "Transformar Datos",
+        description: "Transforma y procesa datos entre pasos",
+        icon: <Settings className="h-6 w-6 text-primary" />,
+        category: "Datos",
+        type: "basic",
+      },
+      {
+        id: "approval-request",
+        name: "Solicitar Aprobación",
+        description: "Envía una solicitud de aprobación a un usuario",
+        icon: <Check className="h-6 w-6 text-primary" />,
+        category: "Aprobación",
         type: "basic",
       },
       {
@@ -808,7 +841,7 @@ export default function CreateWorkflowPage() {
             {step.actionId === "send-email" && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="recipient">Para</Label>
+                  <Label htmlFor="recipient">Para *</Label>
                   <Input
                     id="recipient"
                     placeholder="recipient@example.com"
@@ -820,8 +853,33 @@ export default function CreateWorkflowPage() {
                     }}
                   />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="subject">Asunto</Label>
+                  <Label htmlFor="template">Plantilla (Opcional)</Label>
+                  <Select
+                    defaultValue={step.config.template || ""}
+                    onValueChange={(value) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, template: value },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una plantilla" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin plantilla</SelectItem>
+                      <SelectItem value="welcome">Bienvenida</SelectItem>
+                      <SelectItem value="notification">Notificación</SelectItem>
+                      <SelectItem value="reminder">Recordatorio</SelectItem>
+                      <SelectItem value="approval">Solicitud de Aprobación</SelectItem>
+                      <SelectItem value="report">Reporte</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="subject">Asunto *</Label>
                   <Input
                     id="subject"
                     placeholder="Asunto del correo"
@@ -833,8 +891,9 @@ export default function CreateWorkflowPage() {
                     }}
                   />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="body">Cuerpo</Label>
+                  <Label htmlFor="body">Cuerpo del Mensaje *</Label>
                   <Textarea
                     id="body"
                     placeholder="Contenido del correo"
@@ -847,8 +906,361 @@ export default function CreateWorkflowPage() {
                     }}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="from">De (Opcional)</Label>
+                  <Input
+                    id="from"
+                    placeholder="sender@company.com"
+                    defaultValue={step.config.from || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, from: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cc">CC (Opcional)</Label>
+                  <Input
+                    id="cc"
+                    placeholder="cc@example.com"
+                    defaultValue={step.config.cc || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, cc: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bcc">BCC (Opcional)</Label>
+                  <Input
+                    id="bcc"
+                    placeholder="bcc@example.com"
+                    defaultValue={step.config.bcc || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, bcc: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Prioridad</Label>
+                  <Select
+                    defaultValue={step.config.priority || "normal"}
+                    onValueChange={(value) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, priority: value },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona prioridad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baja</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div><strong>Variables disponibles:</strong></div>
+                  <div>• {`{{nombre}}`} - Nombre del usuario</div>
+                  <div>• {`{{email}}`} - Email del usuario</div>
+                  <div>• {`{{date}}`} - Fecha actual</div>
+                  <div>• {`{{time}}`} - Hora actual</div>
+                  <div>• {`{{company}}`} - Nombre de la empresa</div>
+                  <div>• {`{{formData.campo}}`} - Datos del formulario</div>
+                </div>
+              </div>
+            )}
+
+            {step.actionId === "send-whatsapp" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Número de Teléfono</Label>
+                  <Input
+                    id="phoneNumber"
+                    placeholder="+1234567890"
+                    defaultValue={step.config.phoneNumber || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, phoneNumber: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="message">Mensaje</Label>
+                  <Textarea
+                    id="message"
+                    placeholder="Mensaje de WhatsApp"
+                    rows={4}
+                    defaultValue={step.config.message || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, message: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="template">Plantilla (Opcional)</Label>
+                  <Select
+                    defaultValue={step.config.template || ""}
+                    onValueChange={(value) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, template: value },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una plantilla" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin plantilla</SelectItem>
+                      <SelectItem value="welcome">Bienvenida</SelectItem>
+                      <SelectItem value="reminder">Recordatorio</SelectItem>
+                      <SelectItem value="notification">Notificación</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="text-xs text-muted-foreground">
-                  Usa variables como {`{{nombre}}`} o {`{{email}}`} para datos dinámicos
+                  Usa variables como {`{{nombre}}`} o {`{{telefono}}`} para datos dinámicos
+                </div>
+              </div>
+            )}
+
+            {step.actionId === "webhook-call" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="url">URL</Label>
+                  <Input
+                    id="url"
+                    placeholder="https://api.example.com/webhook"
+                    defaultValue={step.config.url || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, url: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="method">Método HTTP</Label>
+                  <Select
+                    defaultValue={step.config.method || "POST"}
+                    onValueChange={(value) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, method: value },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GET">GET</SelectItem>
+                      <SelectItem value="POST">POST</SelectItem>
+                      <SelectItem value="PUT">PUT</SelectItem>
+                      <SelectItem value="PATCH">PATCH</SelectItem>
+                      <SelectItem value="DELETE">DELETE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="headers">Headers (JSON)</Label>
+                  <Textarea
+                    id="headers"
+                    placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'
+                    rows={3}
+                    defaultValue={step.config.headers ? JSON.stringify(step.config.headers, null, 2) : ""}
+                    onChange={(e) => {
+                      try {
+                        const headers = e.target.value ? JSON.parse(e.target.value) : {}
+                        updateWorkflowStep(step.id, {
+                          config: { ...step.config, headers },
+                        })
+                      } catch (error) {
+                        // Invalid JSON, don't update
+                      }
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="body">Body (JSON)</Label>
+                  <Textarea
+                    id="body"
+                    placeholder='{"key": "value", "data": "{{formData}}"}'
+                    rows={4}
+                    defaultValue={step.config.body ? JSON.stringify(step.config.body, null, 2) : ""}
+                    onChange={(e) => {
+                      try {
+                        const body = e.target.value ? JSON.parse(e.target.value) : {}
+                        updateWorkflowStep(step.id, {
+                          config: { ...step.config, body },
+                        })
+                      } catch (error) {
+                        // Invalid JSON, don't update
+                      }
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Usa variables como {`{{formData}}`} o {`{{userId}}`} para datos dinámicos
+                </div>
+              </div>
+            )}
+
+            {step.actionId === "transform-data" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="inputField">Campo de Entrada</Label>
+                  <Input
+                    id="inputField"
+                    placeholder="nombre"
+                    defaultValue={step.config.inputField || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, inputField: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="outputField">Campo de Salida</Label>
+                  <Input
+                    id="outputField"
+                    placeholder="nombreCompleto"
+                    defaultValue={step.config.outputField || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, outputField: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transformation">Tipo de Transformación</Label>
+                  <Select
+                    defaultValue={step.config.transformation || "uppercase"}
+                    onValueChange={(value) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, transformation: value },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona transformación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="uppercase">Mayúsculas</SelectItem>
+                      <SelectItem value="lowercase">Minúsculas</SelectItem>
+                      <SelectItem value="trim">Eliminar espacios</SelectItem>
+                      <SelectItem value="format">Formatear</SelectItem>
+                      <SelectItem value="concat">Concatenar</SelectItem>
+                      <SelectItem value="split">Dividir</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mapping">Mapeo (JSON)</Label>
+                  <Textarea
+                    id="mapping"
+                    placeholder='{"prefix": "Sr./Sra.", "suffix": ""}'
+                    rows={3}
+                    defaultValue={step.config.mapping ? JSON.stringify(step.config.mapping, null, 2) : ""}
+                    onChange={(e) => {
+                      try {
+                        const mapping = e.target.value ? JSON.parse(e.target.value) : {}
+                        updateWorkflowStep(step.id, {
+                          config: { ...step.config, mapping },
+                        })
+                      } catch (error) {
+                        // Invalid JSON, don't update
+                      }
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Define reglas de transformación para procesar los datos
+                </div>
+              </div>
+            )}
+
+            {step.actionId === "approval-request" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="approver">Aprobador</Label>
+                  <Input
+                    id="approver"
+                    placeholder="supervisor@empresa.com"
+                    defaultValue={step.config.approver || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, approver: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="message">Mensaje de Solicitud</Label>
+                  <Textarea
+                    id="message"
+                    placeholder="Por favor aprueba esta solicitud..."
+                    rows={4}
+                    defaultValue={step.config.message || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, message: e.target.value },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Prioridad</Label>
+                  <Select
+                    defaultValue={step.config.priority || "normal"}
+                    onValueChange={(value) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, priority: value },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona prioridad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baja</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="timeout">Timeout (horas)</Label>
+                  <Input
+                    id="timeout"
+                    type="number"
+                    placeholder="24"
+                    defaultValue={step.config.timeout || ""}
+                    onChange={(e) => {
+                      updateWorkflowStep(step.id, {
+                        config: { ...step.config, timeout: parseInt(e.target.value) || 24 },
+                      })
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  El sistema enviará recordatorios automáticos si no se aprueba en el tiempo especificado
                 </div>
               </div>
             )}

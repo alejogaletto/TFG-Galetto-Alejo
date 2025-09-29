@@ -1,3 +1,5 @@
+import { emailService } from "./email-service"
+
 // Tipos para el motor de workflows
 export interface WorkflowStep {
   id: string
@@ -134,6 +136,18 @@ export class WorkflowEngine {
           case "send-email":
             await this.executeSendEmail(step, execution)
             break
+          case "send-whatsapp":
+            await this.executeSendWhatsApp(step, execution)
+            break
+          case "webhook-call":
+            await this.executeWebhookCall(step, execution)
+            break
+          case "transform-data":
+            await this.executeTransformData(step, execution)
+            break
+          case "approval-request":
+            await this.executeApprovalRequest(step, execution)
+            break
           case "delay":
             await this.executeDelay(step, execution)
             break
@@ -163,16 +177,135 @@ export class WorkflowEngine {
   }
 
   private async executeSendEmail(step: WorkflowStep, execution: WorkflowExecution): Promise<void> {
-    const { recipient, subject, body } = step.config
+    const { recipient, subject, body, template, from, cc, bcc, priority, attachments } = step.config
 
-    // Simulate email sending
-    execution.logs.push(`Enviando email a: ${recipient}`)
-    execution.logs.push(`Asunto: ${subject}`)
+    try {
+      // Validate required fields
+      if (!recipient) {
+        throw new Error("Recipient is required")
+      }
+      if (!subject) {
+        throw new Error("Subject is required")
+      }
+      if (!body && !template) {
+        throw new Error("Body or template is required")
+      }
+
+      execution.logs.push(`Enviando email a: ${recipient}`)
+      execution.logs.push(`Asunto: ${subject}`)
+
+      // Process template if specified
+      let emailBody = body
+      let emailSubject = subject
+
+      if (template) {
+        execution.logs.push(`Usando plantilla: ${template}`)
+        const templateResult = this.processEmailTemplate(template, execution.context)
+        emailBody = templateResult.body
+        emailSubject = templateResult.subject || subject
+      }
+
+      // Process variables in body and subject
+      emailBody = this.processVariables(emailBody, execution.context)
+      emailSubject = this.processVariables(emailSubject, execution.context)
+
+      // Prepare email options
+      const emailOptions = {
+        to: recipient,
+        subject: emailSubject,
+        text: emailBody,
+        html: this.convertToHtml(emailBody),
+        from: from || process.env.SMTP_FROM,
+        cc: cc,
+        bcc: bcc,
+        priority: priority || "normal",
+        attachments: attachments || []
+      }
+
+      // Send email
+      const success = await emailService.sendEmail(emailOptions)
+      
+      if (success) {
+        execution.logs.push("Email enviado exitosamente")
+        execution.context[`email_${step.id}_sent`] = true
+        execution.context[`email_${step.id}_recipient`] = recipient
+      } else {
+        throw new Error("Failed to send email")
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      execution.logs.push(`Error enviando email: ${errorMessage}`)
+      throw error
+    }
+  }
+
+  private async executeSendWhatsApp(step: WorkflowStep, execution: WorkflowExecution): Promise<void> {
+    const { phoneNumber, message, template } = step.config
+
+    // Simulate WhatsApp sending
+    execution.logs.push(`Enviando WhatsApp a: ${phoneNumber}`)
+    execution.logs.push(`Mensaje: ${message}`)
+    if (template) {
+      execution.logs.push(`Usando plantilla: ${template}`)
+    }
+
+    // Simulate delay
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+
+    execution.logs.push("Mensaje de WhatsApp enviado exitosamente")
+  }
+
+  private async executeWebhookCall(step: WorkflowStep, execution: WorkflowExecution): Promise<void> {
+    const { url, method, headers, body, timeout } = step.config
+
+    // Simulate webhook call
+    execution.logs.push(`Realizando llamada ${method} a: ${url}`)
+    if (headers) {
+      execution.logs.push(`Headers: ${JSON.stringify(headers)}`)
+    }
+    if (body) {
+      execution.logs.push(`Body: ${JSON.stringify(body)}`)
+    }
+
+    // Simulate delay
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    execution.logs.push("Llamada webhook completada exitosamente")
+  }
+
+  private async executeTransformData(step: WorkflowStep, execution: WorkflowExecution): Promise<void> {
+    const { inputField, outputField, transformation, mapping } = step.config
+
+    // Simulate data transformation
+    execution.logs.push(`Transformando datos de: ${inputField} a ${outputField}`)
+    execution.logs.push(`Tipo de transformación: ${transformation}`)
+    if (mapping) {
+      execution.logs.push(`Mapeo aplicado: ${JSON.stringify(mapping)}`)
+    }
+
+    // Simulate delay
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    execution.logs.push("Transformación de datos completada exitosamente")
+  }
+
+  private async executeApprovalRequest(step: WorkflowStep, execution: WorkflowExecution): Promise<void> {
+    const { approver, message, timeout, priority } = step.config
+
+    // Simulate approval request
+    execution.logs.push(`Enviando solicitud de aprobación a: ${approver}`)
+    execution.logs.push(`Mensaje: ${message}`)
+    if (priority) {
+      execution.logs.push(`Prioridad: ${priority}`)
+    }
+    if (timeout) {
+      execution.logs.push(`Timeout: ${timeout} horas`)
+    }
 
     // Simulate delay
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    execution.logs.push("Email enviado exitosamente")
+    execution.logs.push("Solicitud de aprobación enviada exitosamente")
   }
 
   private async executeDelay(step: WorkflowStep, execution: WorkflowExecution): Promise<void> {
@@ -242,5 +375,96 @@ export class WorkflowEngine {
     this.executions.delete(id)
     this.persistWorkflows()
     this.persistExecutions()
+  }
+
+  // Email processing helpers
+  private processEmailTemplate(templateName: string, context: Record<string, any>): { body: string; subject?: string } {
+    const templates = {
+      welcome: {
+        subject: "¡Bienvenido a {{company}}!",
+        body: `Hola {{name}},\n\n¡Bienvenido a {{company}}!\n\nGracias por registrarte. Estamos emocionados de tenerte a bordo.\n\nSaludos,\nEl equipo de {{company}}`
+      },
+      notification: {
+        subject: "Notificación: {{title}}",
+        body: `Hola {{name}},\n\n{{message}}\n\nFecha: {{date}}\n\nSaludos,\n{{company}}`
+      },
+      reminder: {
+        subject: "Recordatorio: {{title}}",
+        body: `Hola {{name}},\n\nEste es un recordatorio sobre: {{title}}\n\n{{message}}\n\nPor favor, {{action}} antes del {{deadline}}.\n\nSaludos,\n{{company}}`
+      },
+      approval: {
+        subject: "Solicitud de Aprobación: {{title}}",
+        body: `Hola {{approver}},\n\nSe requiere tu aprobación para: {{title}}\n\nDetalles: {{details}}\n\nPor favor, revisa y aprueba esta solicitud.\n\nSaludos,\n{{company}}`
+      },
+      report: {
+        subject: "Reporte: {{reportName}}",
+        body: `Hola {{name}},\n\nAdjunto encontrarás el reporte: {{reportName}}\n\nPeríodo: {{period}}\n\nResumen: {{summary}}\n\nSaludos,\n{{company}}`
+      }
+    }
+
+    const template = templates[templateName as keyof typeof templates]
+    if (!template) {
+      throw new Error(`Template '${templateName}' not found`)
+    }
+
+    return {
+      body: this.processVariables(template.body, context),
+      subject: template.subject ? this.processVariables(template.subject, context) : undefined
+    }
+  }
+
+  private processVariables(text: string, context: Record<string, any>): string {
+    if (!text) return text
+
+    return text.replace(/\{\{([^}]+)\}\}/g, (match, variable) => {
+      const trimmedVariable = variable.trim()
+      
+      // Handle nested properties (e.g., user.name)
+      const value = this.getNestedProperty(context, trimmedVariable)
+      
+      if (value !== undefined) {
+        return String(value)
+      }
+      
+      // Handle special variables
+      switch (trimmedVariable) {
+        case 'date':
+          return new Date().toLocaleDateString('es-ES')
+        case 'time':
+          return new Date().toLocaleTimeString('es-ES')
+        case 'datetime':
+          return new Date().toLocaleString('es-ES')
+        case 'company':
+          return 'AutomateSMB'
+        default:
+          return match // Return original if not found
+      }
+    })
+  }
+
+  private getNestedProperty(obj: Record<string, any>, path: string): any {
+    return path.split('.').reduce((current, key) => {
+      return current && current[key] !== undefined ? current[key] : undefined
+    }, obj)
+  }
+
+  private convertToHtml(text: string): string {
+    if (!text) return text
+
+    // Convert line breaks to HTML
+    let html = text.replace(/\n/g, '<br>')
+    
+    // Convert URLs to links
+    html = html.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')
+    
+    // Convert email addresses to mailto links
+    html = html.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, '<a href="mailto:$1">$1</a>')
+    
+    // Wrap in basic HTML structure
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6;">
+        ${html}
+      </div>
+    `
   }
 }

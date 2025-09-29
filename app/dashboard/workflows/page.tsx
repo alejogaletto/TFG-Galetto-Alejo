@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -45,63 +45,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { WorkflowEngine, Workflow } from "@/lib/workflow-engine"
 
 export default function WorkflowsPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
+  const [workflows, setWorkflows] = useState<Workflow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Mock data for workflows
-  const [workflows, setWorkflows] = useState([
-    {
-      id: 1,
-      name: "Notificación de Nuevo Cliente",
-      description: "Envía email automático cuando se registra un nuevo cliente",
-      status: "active",
-      trigger: "form_submission",
-      lastRun: "hace 2 horas",
-      executions: 156,
-      successRate: 98,
-      created: "2024-01-15",
-      actions: ["email", "database"],
-    },
-    {
-      id: 2,
-      name: "Procesamiento de Pedidos",
-      description: "Automatiza el flujo de procesamiento de pedidos",
-      status: "active",
-      trigger: "database_update",
-      lastRun: "hace 30 minutos",
-      executions: 89,
-      successRate: 95,
-      created: "2024-01-10",
-      actions: ["email", "webhook", "database"],
-    },
-    {
-      id: 3,
-      name: "Recordatorio de Seguimiento",
-      description: "Envía recordatorios para seguimiento de leads",
-      status: "paused",
-      trigger: "schedule",
-      lastRun: "hace 1 día",
-      executions: 234,
-      successRate: 92,
-      created: "2024-01-05",
-      actions: ["email", "slack"],
-    },
-    {
-      id: 4,
-      name: "Backup Automático",
-      description: "Respalda datos importantes diariamente",
-      status: "active",
-      trigger: "schedule",
-      lastRun: "hace 6 horas",
-      executions: 45,
-      successRate: 100,
-      created: "2024-01-20",
-      actions: ["database", "cloud_storage"],
-    },
-  ])
+  // Initialize workflow engine and load workflows
+  useEffect(() => {
+    const workflowEngine = WorkflowEngine.getInstance()
+    workflowEngine.loadWorkflows()
+    const loadedWorkflows = workflowEngine.getAllWorkflows()
+    setWorkflows(loadedWorkflows)
+    setIsLoading(false)
+  }, [])
+
 
   // Mock data for integrations
   const [integrations, setIntegrations] = useState([
@@ -215,7 +176,7 @@ export default function WorkflowsPage() {
     },
   ]
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
         return "bg-green-100 text-green-800 border-green-200"
@@ -230,7 +191,7 @@ export default function WorkflowsPage() {
     }
   }
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "active":
         return <CheckCircle className="h-4 w-4" />
@@ -245,7 +206,7 @@ export default function WorkflowsPage() {
     }
   }
 
-  const getTriggerIcon = (trigger) => {
+  const getTriggerIcon = (trigger: string) => {
     switch (trigger) {
       case "form_submission":
         return <FileText className="h-4 w-4" />
@@ -260,7 +221,7 @@ export default function WorkflowsPage() {
     }
   }
 
-  const connectService = (serviceId) => {
+  const connectService = (serviceId: string) => {
     router.push(`/dashboard/workflows/integrations/connect/${serviceId}`)
   }
 
@@ -268,7 +229,8 @@ export default function WorkflowsPage() {
     const matchesSearch =
       workflow.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       workflow.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = selectedStatus === "all" || workflow.status === selectedStatus
+    const workflowStatus = workflow.isActive ? "active" : "paused"
+    const matchesStatus = selectedStatus === "all" || workflowStatus === selectedStatus
     return matchesSearch && matchesStatus
   })
 
@@ -381,23 +343,46 @@ export default function WorkflowsPage() {
                 </DropdownMenu>
               </div>
 
-              <div className="grid gap-4">
-                {filteredWorkflows.map((workflow) => (
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Cargando workflows...</div>
+                </div>
+              ) : filteredWorkflows.length === 0 ? (
+                <div className="text-center py-12">
+                  <GitBranch className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    {workflows.length === 0 ? "No hay workflows" : "No se encontraron workflows"}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    {workflows.length === 0 
+                      ? "Crea tu primer workflow para automatizar tareas" 
+                      : "Intenta ajustar los filtros de búsqueda"}
+                  </p>
+                  {workflows.length === 0 && (
+                    <Button onClick={() => router.push("/dashboard/workflows/create")}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Crear Primer Workflow
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {filteredWorkflows.map((workflow) => (
                   <Card key={workflow.id} className="overflow-hidden">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-muted rounded-lg">{getTriggerIcon(workflow.trigger)}</div>
+                          <div className="p-2 bg-muted rounded-lg">{getTriggerIcon(workflow.steps[0]?.actionType || "form_submission")}</div>
                           <div>
                             <CardTitle className="text-lg">{workflow.name}</CardTitle>
                             <CardDescription>{workflow.description}</CardDescription>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(workflow.status)}>
+                          <Badge className={getStatusColor(workflow.isActive ? "active" : "paused")}>
                             <div className="flex items-center gap-1">
-                              {getStatusIcon(workflow.status)}
-                              <span className="capitalize">{workflow.status}</span>
+                              {getStatusIcon(workflow.isActive ? "active" : "paused")}
+                              <span className="capitalize">{workflow.isActive ? "active" : "paused"}</span>
                             </div>
                           </Badge>
                           <DropdownMenu>
@@ -422,7 +407,7 @@ export default function WorkflowsPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem>
-                                {workflow.status === "active" ? (
+                                {workflow.isActive ? (
                                   <>
                                     <Pause className="mr-2 h-4 w-4" />
                                     Pausar
@@ -447,42 +432,25 @@ export default function WorkflowsPage() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
                           <div className="text-sm text-muted-foreground">Última Ejecución</div>
-                          <div className="font-medium">{workflow.lastRun}</div>
+                          <div className="font-medium">Nunca</div>
                         </div>
                         <div>
                           <div className="text-sm text-muted-foreground">Total Ejecuciones</div>
-                          <div className="font-medium">{workflow.executions}</div>
+                          <div className="font-medium">0</div>
                         </div>
                         <div>
-                          <div className="text-sm text-muted-foreground">Tasa de Éxito</div>
-                          <div className="font-medium">{workflow.successRate}%</div>
+                          <div className="text-sm text-muted-foreground">Pasos</div>
+                          <div className="font-medium">{workflow.steps.length}</div>
                         </div>
                         <div>
                           <div className="text-sm text-muted-foreground">Creado</div>
-                          <div className="font-medium">{workflow.created}</div>
+                          <div className="font-medium">{workflow.createdAt.toLocaleDateString()}</div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-
-              {filteredWorkflows.length === 0 && (
-                <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <GitBranch className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No hay workflows</h3>
-                    <p className="text-muted-foreground mb-4 text-center">
-                      {searchQuery
-                        ? "No se encontraron workflows que coincidan con tu búsqueda"
-                        : "Crea tu primer workflow para automatizar procesos"}
-                    </p>
-                    <Button onClick={() => router.push("/dashboard/workflows/create")}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Crear Primer Workflow
-                    </Button>
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
               )}
             </TabsContent>
 
