@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowDown,
   ArrowLeft,
@@ -51,10 +51,16 @@ import { IntegrationsEngine } from "@/lib/integrations-engine"
 
 export default function CreateWorkflowPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
-  const [step, setStep] = useState(1)
-  const [workflowName, setWorkflowName] = useState("")
-  const [workflowDescription, setWorkflowDescription] = useState("")
+  
+  // Check if we're in edit mode
+  const isEditMode = searchParams.get('edit') === 'true'
+  const workflowData = isEditMode ? JSON.parse(decodeURIComponent(searchParams.get('workflow') || '{}')) : null
+  
+  const [step, setStep] = useState(isEditMode ? 3 : 1) // Start at step 3 (canvas) if editing
+  const [workflowName, setWorkflowName] = useState(workflowData?.name || "")
+  const [workflowDescription, setWorkflowDescription] = useState(workflowData?.description || "")
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null)
   const [workflowSteps, setWorkflowSteps] = useState<any[]>([])
@@ -64,7 +70,7 @@ export default function CreateWorkflowPage() {
   const [lineStart, setLineStart] = useState<{ x: number; y: number } | null>(null)
   const [lineEnd, setLineEnd] = useState<{ x: number; y: number } | null>(null)
   const [connections, setConnections] = useState<{ from: number; to: number }[]>([])
-  const [isActive, setIsActive] = useState(true)
+  const [isActive, setIsActive] = useState(workflowData?.isActive ?? true)
   const [isSaving, setIsSaving] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
@@ -76,6 +82,54 @@ export default function CreateWorkflowPage() {
   useEffect(() => {
     workflowEngine.loadWorkflows()
     integrationsEngine.loadIntegrations()
+  }, [])
+
+  // Load workflow data when in edit mode
+  useEffect(() => {
+    if (isEditMode && workflowData) {
+      // Convert workflow steps to canvas format
+      const canvasSteps = workflowData.steps.map((step: any, index: number) => ({
+        id: step.id,
+        type: step.type,
+        actionId: step.actionType,
+        name: step.name,
+        description: step.description,
+        icon: getActionIcon(step.actionType),
+        position: step.position || { x: 50, y: 50 + (index * 130) },
+        config: step.config,
+      }))
+      
+      setWorkflowSteps(canvasSteps)
+      setConnections(workflowData.connections.map((conn: any) => ({
+        from: parseInt(conn.from),
+        to: parseInt(conn.to)
+      })))
+    }
+  }, [isEditMode, workflowData?.id]) // Only depend on workflow ID, not the entire workflowData object
+
+  const getActionIcon = useCallback((actionType: string) => {
+    switch (actionType) {
+      case "send-email":
+        return <Mail className="h-6 w-6 text-primary" />
+      case "send-whatsapp":
+        return <MessageSquare className="h-6 w-6 text-primary" />
+      case "webhook-call":
+        return <Zap className="h-6 w-6 text-primary" />
+      case "transform-data":
+        return <Settings className="h-6 w-6 text-primary" />
+      case "approval-request":
+        return <Check className="h-6 w-6 text-primary" />
+      case "update-database":
+        return <Database className="h-6 w-6 text-primary" />
+      case "delay":
+        return <Clock className="h-6 w-6 text-primary" />
+      case "condition":
+        return <Check className="h-6 w-6 text-primary" />
+      case "notification":
+        return <AlertCircle className="h-6 w-6 text-primary" />
+      default:
+        return <Zap className="h-6 w-6 text-primary" />
+    }
   }, [])
 
   const templates = [
@@ -556,7 +610,7 @@ export default function CreateWorkflowPage() {
 
     try {
       const workflow: Workflow = {
-        id: `workflow_${Date.now()}`,
+        id: isEditMode ? workflowData.id : `workflow_${Date.now()}`,
         name: workflowName,
         description: workflowDescription,
         steps: workflowSteps.map((step) => ({
@@ -573,7 +627,7 @@ export default function CreateWorkflowPage() {
           to: conn.to.toString(),
         })),
         isActive,
-        createdAt: new Date(),
+        createdAt: isEditMode ? workflowData.createdAt : new Date(),
         updatedAt: new Date(),
       }
 
@@ -581,14 +635,14 @@ export default function CreateWorkflowPage() {
 
       toast({
         title: "¡Éxito!",
-        description: `Workflow "${workflowName}" creado exitosamente`,
+        description: `Workflow "${workflowName}" ${isEditMode ? 'actualizado' : 'creado'} exitosamente`,
       })
 
       router.push("/dashboard/workflows")
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudo crear el workflow",
+        description: `No se pudo ${isEditMode ? 'actualizar' : 'crear'} el workflow`,
         variant: "destructive",
       })
     } finally {
@@ -857,10 +911,10 @@ export default function CreateWorkflowPage() {
                 <div className="space-y-2">
                   <Label htmlFor="template">Plantilla (Opcional)</Label>
                   <Select
-                    defaultValue={step.config.template || ""}
+                    defaultValue={step.config.template || "none"}
                     onValueChange={(value) => {
                       updateWorkflowStep(step.id, {
-                        config: { ...step.config, template: value },
+                        config: { ...step.config, template: value === "none" ? "" : value },
                       })
                     }}
                   >
@@ -868,7 +922,7 @@ export default function CreateWorkflowPage() {
                       <SelectValue placeholder="Selecciona una plantilla" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin plantilla</SelectItem>
+                      <SelectItem value="none">Sin plantilla</SelectItem>
                       <SelectItem value="welcome">Bienvenida</SelectItem>
                       <SelectItem value="notification">Notificación</SelectItem>
                       <SelectItem value="reminder">Recordatorio</SelectItem>
@@ -1014,10 +1068,10 @@ export default function CreateWorkflowPage() {
                 <div className="space-y-2">
                   <Label htmlFor="template">Plantilla (Opcional)</Label>
                   <Select
-                    defaultValue={step.config.template || ""}
+                    defaultValue={step.config.template || "none"}
                     onValueChange={(value) => {
                       updateWorkflowStep(step.id, {
-                        config: { ...step.config, template: value },
+                        config: { ...step.config, template: value === "none" ? "" : value },
                       })
                     }}
                   >
@@ -1025,7 +1079,7 @@ export default function CreateWorkflowPage() {
                       <SelectValue placeholder="Selecciona una plantilla" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin plantilla</SelectItem>
+                      <SelectItem value="none">Sin plantilla</SelectItem>
                       <SelectItem value="welcome">Bienvenida</SelectItem>
                       <SelectItem value="reminder">Recordatorio</SelectItem>
                       <SelectItem value="notification">Notificación</SelectItem>
@@ -1681,8 +1735,8 @@ export default function CreateWorkflowPage() {
 
                 <div className="flex-1">
                   <div className="border rounded-lg bg-muted/20 overflow-auto max-h-[80vh]">
-                    <div
-                      ref={canvasRef}
+                  <div
+                    ref={canvasRef}
                       className="relative bg-white"
                       style={{
                         width: `${canvasSize.width}px`,
@@ -1692,11 +1746,11 @@ export default function CreateWorkflowPage() {
                         minWidth: '100%',
                         minHeight: '100%',
                       }}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      onClick={cancelConnection}
-                      onMouseMove={moveConnection}
-                    >
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    onClick={cancelConnection}
+                    onMouseMove={moveConnection}
+                  >
                     {/* Workflow steps */}
                     {workflowSteps.map((step) => (
                       <div
@@ -1909,7 +1963,7 @@ export default function CreateWorkflowPage() {
             <Button onClick={handleNext} disabled={isNextDisabled() || isSaving}>
               {step === 3 ? (
                 <>
-                  {isSaving ? "Guardando..." : "Crear Flujo de Trabajo"}
+                  {isSaving ? "Guardando..." : isEditMode ? "Actualizar Workflow" : "Crear Flujo de Trabajo"}
                   <Save className="ml-2 h-4 w-4" />
                 </>
               ) : (

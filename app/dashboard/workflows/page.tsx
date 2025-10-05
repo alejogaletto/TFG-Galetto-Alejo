@@ -368,7 +368,11 @@ export default function WorkflowsPage() {
               ) : (
                 <div className="grid gap-4">
                   {filteredWorkflows.map((workflow) => (
-                  <Card key={workflow.id} className="overflow-hidden">
+                  <Card 
+                    key={workflow.id} 
+                    className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => router.push(`/dashboard/workflows/${workflow.id}/edit`)}
+                  >
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -387,7 +391,11 @@ export default function WorkflowsPage() {
                           </Badge>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>

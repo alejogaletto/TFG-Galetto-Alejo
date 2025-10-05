@@ -1,5 +1,3 @@
-import { emailService } from "./email-service"
-
 // Tipos para el motor de workflows
 export interface WorkflowStep {
   id: string
@@ -222,15 +220,23 @@ export class WorkflowEngine {
         attachments: attachments || []
       }
 
-      // Send email
-      const success = await emailService.sendEmail(emailOptions)
+      // Send email via API
+      const response = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailOptions)
+      })
+
+      const result = await response.json()
       
-      if (success) {
+      if (response.ok && result.success) {
         execution.logs.push("Email enviado exitosamente")
         execution.context[`email_${step.id}_sent`] = true
         execution.context[`email_${step.id}_recipient`] = recipient
       } else {
-        throw new Error("Failed to send email")
+        throw new Error(result.error || "Failed to send email")
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"

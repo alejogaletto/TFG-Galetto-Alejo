@@ -2,7 +2,7 @@ import nodemailer from "nodemailer"
 
 // Configuración del transportador de email
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
     port: Number.parseInt(process.env.SMTP_PORT || "587"),
     secure: false, // true para 465, false para otros puertos
@@ -19,6 +19,10 @@ export interface EmailOptions {
   text?: string
   html?: string
   from?: string
+  cc?: string | string[]
+  bcc?: string | string[]
+  priority?: "high" | "normal" | "low"
+  attachments?: any[]
 }
 
 export class EmailService {
@@ -36,10 +40,14 @@ export class EmailService {
         subject: options.subject,
         text: options.text,
         html: options.html,
+        cc: options.cc ? (Array.isArray(options.cc) ? options.cc.join(", ") : options.cc) : undefined,
+        bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc.join(", ") : options.bcc) : undefined,
+        priority: options.priority,
+        attachments: options.attachments,
       }
 
       const info = await this.transporter.sendMail(mailOptions)
-      console.log("Email enviado:", info.messageId)
+      console.log("Email enviado:", info.messageId || "No message ID")
       return true
     } catch (error) {
       console.error("Error enviando email:", error)
