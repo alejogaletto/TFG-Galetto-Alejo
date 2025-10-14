@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,116 +59,135 @@ export default function SolutionsPage() {
   const [showNewSolutionDialog, setShowNewSolutionDialog] = useState(false)
   const [newSolutionName, setNewSolutionName] = useState("")
   const [newSolutionDescription, setNewSolutionDescription] = useState("")
+  const [templates, setTemplates] = useState<any[]>([])
+  const [existingSolutions, setExistingSolutions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<number | null>(null)
 
-  // Plantillas predefinidas
-  const templates = [
-    {
-      id: "crm",
-      name: "CRM - Gestión de Clientes",
-      description: "Sistema completo para gestionar leads, clientes y ventas",
-      icon: <Users className="h-8 w-8" />,
-      color: "bg-blue-500",
-      features: ["Dashboard de ventas", "Gestión de leads", "Seguimiento de clientes", "Reportes"],
-      category: "Ventas",
-    },
-    {
-      id: "inventario",
-      name: "Control de Inventario",
-      description: "Gestiona tu inventario, stock y movimientos de productos",
-      icon: <Package className="h-8 w-8" />,
-      color: "bg-green-500",
-      features: ["Control de stock", "Alertas de inventario", "Movimientos", "Reportes"],
-      category: "Inventario",
-    },
-    {
-      id: "analytics",
-      name: "Dashboard Analítico",
-      description: "Visualiza métricas y KPIs importantes de tu negocio",
-      icon: <BarChart3 className="h-8 w-8" />,
-      color: "bg-purple-500",
-      features: ["Gráficos interactivos", "KPIs en tiempo real", "Reportes", "Filtros avanzados"],
-      category: "Analíticas",
-    },
-    {
-      id: "helpdesk",
-      name: "Mesa de Ayuda",
-      description: "Sistema de tickets y soporte al cliente",
-      icon: <Headphones className="h-8 w-8" />,
-      color: "bg-orange-500",
-      features: ["Gestión de tickets", "Chat en vivo", "Base de conocimiento", "SLA"],
-      category: "Soporte",
-    },
-    {
-      id: "ecommerce",
-      name: "E-commerce Dashboard",
-      description: "Panel de control para tienda online",
-      icon: <ShoppingCart className="h-8 w-8" />,
-      color: "bg-pink-500",
-      features: ["Ventas online", "Productos", "Pedidos", "Clientes"],
-      category: "E-commerce",
-    },
-    {
-      id: "project",
-      name: "Gestión de Proyectos",
-      description: "Organiza tareas, equipos y proyectos",
-      icon: <Calendar className="h-8 w-8" />,
-      color: "bg-indigo-500",
-      features: ["Kanban board", "Gantt charts", "Equipos", "Tiempo"],
-      category: "Proyectos",
-    },
-  ]
-
-  // Soluciones existentes del usuario
-  const existingSolutions = [
-    {
-      id: "1",
-      name: "CRM Ventas 2024",
-      description: "Sistema de gestión de clientes y ventas",
-      type: "crm",
-      status: "active",
-      lastModified: "2024-01-15",
-      icon: <Users className="h-5 w-5" />,
-      color: "bg-blue-500",
-    },
-    {
-      id: "2",
-      name: "Inventario Principal",
-      description: "Control de stock y productos",
-      type: "inventario",
-      status: "active",
-      lastModified: "2024-01-10",
-      icon: <Package className="h-5 w-5" />,
-      color: "bg-green-500",
-    },
-    {
-      id: "3",
-      name: "Dashboard Ejecutivo",
-      description: "Métricas y KPIs principales",
-      type: "analytics",
-      status: "draft",
-      lastModified: "2024-01-08",
-      icon: <BarChart3 className="h-5 w-5" />,
-      color: "bg-purple-500",
-    },
-  ]
-
-  const createNewSolutionFromScratch = () => {
-    if (!newSolutionName.trim()) return
-
-    // Redirigir al constructor avanzado con parámetros
-    router.push(
-      `/dashboard/solutions/builder/advanced?name=${encodeURIComponent(newSolutionName)}&description=${encodeURIComponent(newSolutionDescription)}&new=true`,
-    )
+  // Icon mapping helper
+  const getIconComponent = (iconName: string, size = "h-8 w-8") => {
+    const iconMap: Record<string, any> = {
+      users: <Users className={size} />,
+      package: <Package className={size} />,
+      "bar-chart-3": <BarChart3 className={size} />,
+      headphones: <Headphones className={size} />,
+      "shopping-cart": <ShoppingCart className={size} />,
+      calendar: <Calendar className={size} />,
+    }
+    return iconMap[iconName] || <Package className={size} />
   }
 
-  const createSolutionFromTemplate = (templateId: string) => {
-    const template = templates.find((t) => t.id === templateId)
-    if (!template) return
+  // Fetch templates and user solutions
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        
+        // Get user from localStorage (in production, use proper auth)
+        const userStr = localStorage.getItem("user")
+        const user = userStr ? JSON.parse(userStr) : null
+        const currentUserId = user?.id || 1 // Fallback to 1 for demo
+        setUserId(currentUserId)
 
-    // Redirigir al constructor avanzado con plantilla
-    router.push(
-      `/dashboard/solutions/builder/advanced?template=${templateId}&name=${encodeURIComponent(template.name)}&new=true`,
-    )
+        // Fetch templates
+        const templatesRes = await fetch("/api/solutions?is_template=true")
+        if (templatesRes.ok) {
+          const templatesData = await templatesRes.json()
+          setTemplates(
+            templatesData.map((t: any) => ({
+              ...t,
+              icon: getIconComponent(t.icon),
+              features: t.configs?.features || [],
+            }))
+          )
+        }
+
+        // Fetch user's solutions
+        const solutionsRes = await fetch(`/api/solutions?user_id=${currentUserId}&is_template=false`)
+        if (solutionsRes.ok) {
+          const solutionsData = await solutionsRes.json()
+          setExistingSolutions(
+            solutionsData.map((s: any) => ({
+              ...s,
+              icon: getIconComponent(s.icon, "h-5 w-5"),
+              lastModified: s.modification_date || s.creation_date,
+              type: s.template_type,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error("Error fetching solutions:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const createNewSolutionFromScratch = async () => {
+    if (!newSolutionName.trim() || !userId) return
+
+    try {
+      // Create a new solution from scratch
+      const response = await fetch("/api/solutions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          name: newSolutionName,
+          description: newSolutionDescription,
+          status: "draft",
+          is_template: false,
+        }),
+      })
+
+      if (response.ok) {
+        const newSolution = await response.json()
+        setShowNewSolutionDialog(false)
+        setNewSolutionName("")
+        setNewSolutionDescription("")
+        // Redirect to the advanced builder for custom solution creation
+        router.push(
+          `/dashboard/solutions/builder/advanced?id=${newSolution.id}&name=${encodeURIComponent(newSolutionName)}&description=${encodeURIComponent(newSolutionDescription)}&new=true`
+        )
+      } else {
+        alert("Error creating solution")
+      }
+    } catch (error) {
+      console.error("Error creating solution:", error)
+      alert("Error creating solution")
+    }
+  }
+
+  const createSolutionFromTemplate = async (templateId: string) => {
+    const template = templates.find((t) => t.id.toString() === templateId.toString())
+    if (!template || !userId) return
+
+    try {
+      // Instantiate a solution from a template
+      const response = await fetch(`/api/solutions/${template.id}/instantiate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          name: `${template.name}`,
+          description: template.description,
+        }),
+      })
+
+      if (response.ok) {
+        const newSolution = await response.json()
+        setShowNewSolutionDialog(false)
+        // Redirect to the setup wizard to configure the solution
+        router.push(`/dashboard/solutions/setup?id=${newSolution.id}&template=${template.template_type || templateId}`)
+      } else {
+        alert("Error creating solution from template")
+      }
+    } catch (error) {
+      console.error("Error creating solution from template:", error)
+      alert("Error creating solution from template")
+    }
   }
 
   const filteredSolutions = existingSolutions.filter((solution) =>
@@ -325,7 +345,7 @@ export default function SolutionsPage() {
                                   </div>
                                   <p className="text-sm text-muted-foreground mb-2">{template.description}</p>
                                   <div className="flex flex-wrap gap-1">
-                                    {template.features.slice(0, 3).map((feature) => (
+                                    {template.features.slice(0, 3).map((feature: string) => (
                                       <Badge key={feature} variant="secondary" className="text-xs">
                                         {feature}
                                       </Badge>
@@ -383,40 +403,57 @@ export default function SolutionsPage() {
           </div>
 
           {/* Estadísticas rápidas */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Soluciones</CardTitle>
-                <Building className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{existingSolutions.length}</div>
-                <p className="text-xs text-muted-foreground">+2 este mes</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Activas</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {existingSolutions.filter((s) => s.status === "active").length}
-                </div>
-                <p className="text-xs text-muted-foreground">100% operativas</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Plantillas</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{templates.length}</div>
-                <p className="text-xs text-muted-foreground">Disponibles</p>
-              </CardContent>
-            </Card>
-          </div>
+          {loading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-4" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-16 mb-2" />
+                    <Skeleton className="h-3 w-24" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Soluciones</CardTitle>
+                  <Building className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{existingSolutions.length}</div>
+                  <p className="text-xs text-muted-foreground">Tus soluciones</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Activas</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {existingSolutions.filter((s) => s.status === "active").length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">En uso</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Plantillas</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{templates.length}</div>
+                  <p className="text-xs text-muted-foreground">Disponibles</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Lista de soluciones existentes */}
           <div className="space-y-4">
@@ -430,7 +467,29 @@ export default function SolutionsPage() {
               </div>
             </div>
 
-            {filteredSolutions.length === 0 ? (
+            {loading ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-10 w-10 rounded-lg" />
+                          <div>
+                            <Skeleton className="h-5 w-32 mb-2" />
+                            <Skeleton className="h-4 w-48" />
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-4 w-full mb-3" />
+                      <Skeleton className="h-4 w-20" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredSolutions.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Building className="h-12 w-12 text-muted-foreground mb-4" />
@@ -449,7 +508,11 @@ export default function SolutionsPage() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredSolutions.map((solution) => (
-                  <Card key={solution.id} className="hover:shadow-md transition-shadow">
+                  <Card 
+                    key={solution.id} 
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => router.push(`/dashboard/solutions/${solution.id}`)}
+                  >
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
@@ -461,7 +524,11 @@ export default function SolutionsPage() {
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -479,12 +546,15 @@ export default function SolutionsPage() {
                                 Editar
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
                               <Settings className="mr-2 h-4 w-4" />
                               Configurar
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Eliminar
                             </DropdownMenuItem>

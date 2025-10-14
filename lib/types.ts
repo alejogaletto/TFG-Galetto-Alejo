@@ -95,3 +95,29 @@ export type WorkflowStep = {
   configs?: any;
   external_services?: any;
 };
+
+export type Solution = {
+  id: number;
+  user_id?: number;
+  name: string;
+  description?: string;
+  template_type?: string;
+  is_template?: boolean;
+  template_id?: number;
+  status?: string;
+  icon?: string;
+  color?: string;
+  category?: string;
+  configs?: any;
+  creation_date?: string;
+  modification_date?: string;
+};
+
+export type SolutionComponent = {
+  id: number;
+  solution_id: number;
+  component_type: 'form' | 'database' | 'workflow' | 'virtual_schema';
+  component_id: number;
+  configs?: any;
+  creation_date?: string;
+};
