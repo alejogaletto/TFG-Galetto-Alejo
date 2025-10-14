@@ -149,6 +149,72 @@ const response = await fetch('/api/solution-components', {
 });
 ```
 
+## Step 6: Using the Solution Builder
+
+The solution builder provides a visual interface for creating custom dashboards.
+
+### Creating a Solution from Scratch
+
+1. Go to `/dashboard/solutions`
+2. Click "Nueva Solución"
+3. Select "Desde Cero" tab
+4. Enter name and description
+5. Click "Crear Solución"
+6. You'll be redirected to the advanced builder
+
+### Using the Advanced Builder
+
+**Drag and Drop Components:**
+1. Browse components in the left sidebar
+2. Drag any component to the canvas area
+3. Components appear in the canvas immediately
+
+**Configure Components:**
+1. Click on any component in the canvas
+2. Configuration panel appears on the right
+3. Set data sources, titles, colors, etc.
+4. Changes apply in real-time
+
+**Undo/Redo:**
+1. **Undo (Deshacer)**: Click to revert the last change
+   - Removes the last added component
+   - Reverts configuration changes
+   - Restores deleted components
+   - Button is disabled when no history available
+
+2. **Redo (Rehacer)**: Click to restore undone changes
+   - Restores the last undone action
+   - Button is disabled when no future history
+
+**Example Workflow:**
+```
+1. Drag "Stat Card" → History saved
+2. Configure title and data source → History updated
+3. Add "Data Table" → History saved
+4. Oops! Wrong component → Click "Deshacer"
+5. Table removed, back to just the stat card
+6. Changed your mind? → Click "Rehacer"
+7. Table comes back
+```
+
+**Save Your Work:**
+1. Click "Guardar" button
+2. Solution configuration is saved
+3. Can be edited later
+
+### Using Template-Based Solutions
+
+1. Click "Nueva Solución"
+2. Select "Plantillas" tab
+3. Click on a template (e.g., "CRM")
+4. You'll be redirected to the setup wizard
+5. Follow the wizard steps:
+   - Select modules
+   - Choose forms
+   - Configure databases
+   - Set up workflows
+6. Click "Crear Solución" to finish
+
 ## Common Issues
 
 ### Issue 1: "Solution table does not exist"

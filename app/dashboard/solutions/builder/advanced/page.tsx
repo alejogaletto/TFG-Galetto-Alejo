@@ -207,7 +207,7 @@ export default function AdvancedSolutionBuilder() {
   ]
 
   // Función para obtener componentes iniciales según la plantilla
-  const getInitialComponents = (template) => {
+  const getInitialComponents = (template: string) => {
     switch (template) {
       case "crm":
         return [
@@ -312,8 +312,43 @@ export default function AdvancedSolutionBuilder() {
   // Configuración del componente seleccionado
   const [componentConfig, setComponentConfig] = useState({})
 
+  // History for undo/redo
+  const [history, setHistory] = useState<any[]>([getInitialComponents(templateType)])
+  const [historyIndex, setHistoryIndex] = useState(0)
+
+  // Update history whenever canvasComponents changes
+  const updateHistory = (newComponents: any[]) => {
+    // Remove any future history if we're not at the end
+    const newHistory = history.slice(0, historyIndex + 1)
+    newHistory.push(newComponents)
+    setHistory(newHistory)
+    setHistoryIndex(newHistory.length - 1)
+  }
+
+  // Undo function
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      setCanvasComponents(history[newIndex])
+    }
+  }
+
+  // Redo function
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      setCanvasComponents(history[newIndex])
+    }
+  }
+
+  // Check if undo/redo is available
+  const canUndo = historyIndex > 0
+  const canRedo = historyIndex < history.length - 1
+
   // Función mejorada para manejar el drag and drop
-  const handleDragEnd = (result) => {
+  const handleDragEnd = (result: any) => {
     console.log("Drag end result:", result)
 
     if (!result.destination) {
@@ -343,9 +378,10 @@ export default function AdvancedSolutionBuilder() {
 
       console.log("New component:", newComponent)
 
-      setCanvasComponents((prev) => {
+      setCanvasComponents((prev: any) => {
         const updated = [...prev, newComponent]
         console.log("Updated canvas components:", updated)
+        updateHistory(updated)
         return updated
       })
     }
@@ -359,21 +395,30 @@ export default function AdvancedSolutionBuilder() {
       items.splice(destination.index, 0, reorderedItem)
 
       setCanvasComponents(items)
+      updateHistory(items)
     }
   }
 
-  const updateComponentConfig = (componentId, newConfig) => {
-    setCanvasComponents((prev) =>
-      prev.map((comp) => (comp.id === componentId ? { ...comp, config: { ...comp.config, ...newConfig } } : comp)),
-    )
+  const updateComponentConfig = (componentId: string, newConfig: any) => {
+    setCanvasComponents((prev) => {
+      const updated = prev.map((comp) => 
+        comp.id === componentId ? { ...comp, config: { ...comp.config, ...newConfig } } : comp
+      )
+      updateHistory(updated)
+      return updated
+    })
   }
 
-  const removeComponent = (componentId) => {
-    setCanvasComponents((prev) => prev.filter((comp) => comp.id !== componentId))
+  const removeComponent = (componentId: string) => {
+    setCanvasComponents((prev) => {
+      const updated = prev.filter((comp) => comp.id !== componentId)
+      updateHistory(updated)
+      return updated
+    })
     setSelectedCanvasComponent(null)
   }
 
-  const duplicateComponent = (componentId) => {
+  const duplicateComponent = (componentId: string) => {
     const component = canvasComponents.find((comp) => comp.id === componentId)
     if (component) {
       const newComponent = {
@@ -381,11 +426,13 @@ export default function AdvancedSolutionBuilder() {
         id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         position: { ...component.position, y: component.position.y + 1 },
       }
-      setCanvasComponents([...canvasComponents, newComponent])
+      const updated = [...canvasComponents, newComponent]
+      setCanvasComponents(updated)
+      updateHistory(updated)
     }
   }
 
-  const renderComponentPreview = (component) => {
+  const renderComponentPreview = (component: any) => {
     switch (component.type) {
       case "stat-card":
         return (
@@ -865,11 +912,21 @@ export default function AdvancedSolutionBuilder() {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleUndo}
+                disabled={!canUndo}
+              >
                 <Undo className="mr-2 h-4 w-4" />
                 Deshacer
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleRedo}
+                disabled={!canRedo}
+              >
                 <Redo className="mr-2 h-4 w-4" />
                 Rehacer
               </Button>
@@ -1119,7 +1176,7 @@ export default function AdvancedSolutionBuilder() {
                                     gridRow: `span ${component.size.height}`,
                                     ...provided.draggableProps.style,
                                   }}
-                                  onClick={() => setSelectedCanvasComponent(component.id)}
+                                  onClick={() => setSelectedCanvasComponent(component.id as any)}
                                 >
                                   {renderComponentPreview(component)}
 
@@ -1133,7 +1190,7 @@ export default function AdvancedSolutionBuilder() {
                                           className="h-6 w-6 p-0"
                                           onClick={(e) => {
                                             e.stopPropagation()
-                                            setSelectedCanvasComponent(component.id)
+                                            setSelectedCanvasComponent(component.id as any)
                                             setShowComponentConfig(true)
                                           }}
                                         >

@@ -296,6 +296,79 @@ Shows:
 - Data from the solution (e.g., leads in a CRM, inventory items)
 - Analytics and reports
 
+### Solution Builder (`/dashboard/solutions/builder/advanced/page.tsx`)
+
+The advanced solution builder is a drag-and-drop interface for creating custom solution dashboards.
+
+**Key Features:**
+
+1. **Component Palette**: Pre-built UI components that can be dragged onto the canvas
+   - Stat Cards
+   - Data Tables
+   - Charts (Bar, Pie, Line)
+   - Progress Bars
+   - Alert Lists
+   - Activity Feeds
+   - User Lists
+
+2. **Canvas Area**: Visual workspace where components are arranged
+   - Drag components from palette to canvas
+   - Reorder components within canvas
+   - Preview components in real-time
+
+3. **Component Configuration**: 
+   - Click any component to configure
+   - Set data sources
+   - Customize appearance
+   - Configure fields and options
+
+4. **Undo/Redo Functionality**: 
+   - Full history tracking of all canvas changes
+   - **Undo (Deshacer)**: Revert to previous state
+   - **Redo (Rehacer)**: Restore undone changes
+   - Buttons automatically disable when no history available
+   - History preserved for:
+     - Adding components
+     - Removing components
+     - Duplicating components
+     - Reordering components
+     - Updating component configuration
+
+5. **Save & Preview**:
+   - Live preview mode
+   - Save solution configuration
+   - Export solution structure
+
+**Usage Example:**
+
+```typescript
+// User workflow in the builder:
+1. User drags "Stat Card" component to canvas → History saved
+2. User configures data source and title → History updated
+3. User adds "Data Table" component → History saved
+4. User realizes mistake → Clicks "Deshacer" (Undo)
+5. Canvas returns to state before table was added
+6. User clicks "Rehacer" (Redo) if they want it back
+```
+
+**History System:**
+- Maintains array of all canvas states
+- Current position tracked with index
+- Maximum history: unlimited (in-memory)
+- New changes after undo clear forward history (standard behavior)
+
+### Solution Setup Wizard (`/dashboard/solutions/setup/page.tsx`)
+
+Step-by-step wizard for configuring template-based solutions.
+
+**Steps:**
+1. **Basic Information**: Name, description
+2. **Module Selection**: Choose which modules to include
+3. **Forms Configuration**: Select forms to use
+4. **Database Setup**: Configure data storage
+5. **Workflows**: Set up automation
+6. **Review & Deploy**: Final confirmation
+
 ## Use Cases
 
 ### 1. CRM Solution
