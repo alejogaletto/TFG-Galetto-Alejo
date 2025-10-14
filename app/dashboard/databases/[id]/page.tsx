@@ -68,14 +68,21 @@ export default function DatabasePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("overview")
+  const [editedName, setEditedName] = useState("")
+  const [editedDescription, setEditedDescription] = useState("")
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
   
   // State for adding/editing tables and fields
   const [showAddTableDialog, setShowAddTableDialog] = useState(false)
   const [showAddFieldDialog, setShowAddFieldDialog] = useState(false)
   const [showEditTableDialog, setShowEditTableDialog] = useState(false)
   const [showEditFieldDialog, setShowEditFieldDialog] = useState(false)
-  const [selectedTable, setSelectedTable] = useState<VirtualTableSchema | null>(null)
-  const [selectedField, setSelectedField] = useState<VirtualFieldSchema | null>(null)
+  const [selectedFieldForEdit, setSelectedFieldForEdit] = useState<VirtualFieldSchema | null>(null)
+  const [selectedTableForEdit, setSelectedTableForEdit] = useState<VirtualTableSchema | null>(null)
   
   // Form state for new table
   const [newTable, setNewTable] = useState({
@@ -92,11 +99,46 @@ export default function DatabasePage() {
     description: ""
   })
 
+  // Business data state
+  const [businessData, setBusinessData] = useState<any[]>([])
+  const [loadingData, setLoadingData] = useState(false)
+  const [selectedTable, setSelectedTable] = useState<VirtualTableSchema | null>(null)
+  const [showDataDialog, setShowDataDialog] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<any>(null)
+  const [recordFormData, setRecordFormData] = useState<Record<string, any>>({})
+
   useEffect(() => {
     if (params.id) {
       fetchDatabase(params.id as string)
     }
   }, [params.id])
+
+  useEffect(() => {
+    if (database) {
+      setEditedName(database.name)
+      setEditedDescription(database.description || "")
+    }
+  }, [database])
+
+  useEffect(() => {
+    if (database) {
+      const nameChanged = editedName !== database.name
+      const descriptionChanged = editedDescription !== (database.description || "")
+      setHasUnsavedChanges(nameChanged || descriptionChanged)
+    }
+  }, [editedName, editedDescription, database])
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
 
   const fetchDatabase = async (id: string) => {
     try {
@@ -118,6 +160,11 @@ export default function DatabasePage() {
       console.log('Total fields count:', data.tables?.reduce((acc: number, table: any) => acc + (table.fields?.length || 0), 0) || 0) // Debug log
       
       setDatabase(data)
+      
+      // Set the first table as selected for data tab
+      if (data.tables && data.tables.length > 0) {
+        setSelectedTable(data.tables[0])
+      }
     } catch (err) {
       console.error('Error fetching database:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
@@ -125,6 +172,37 @@ export default function DatabasePage() {
       setLoading(false)
     }
   }
+
+  const fetchBusinessData = async (tableId: number) => {
+    try {
+      setLoadingData(true)
+      const response = await fetch('/api/business-data')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch business data')
+      }
+      
+      const allData = await response.json()
+      // Filter data for the selected table
+      const tableData = allData.filter((record: any) => record.virtual_table_schema_id === tableId)
+      setBusinessData(tableData)
+    } catch (error) {
+      console.error('Error fetching business data:', error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedTable && activeTab === 'data') {
+      fetchBusinessData(selectedTable.id)
+    }
+  }, [selectedTable, activeTab])
 
   // CRUD functions for tables
   const createTable = async () => {
@@ -189,7 +267,7 @@ export default function DatabasePage() {
       await fetchDatabase(params.id as string)
       
       setShowEditTableDialog(false)
-      setSelectedTable(null)
+      setSelectedTableForEdit(null)
       
       toast({
         title: "Tabla actualizada",
@@ -302,7 +380,7 @@ export default function DatabasePage() {
       await fetchDatabase(params.id as string)
       
       setShowEditFieldDialog(false)
-      setSelectedField(null)
+      setSelectedFieldForEdit(null)
       
       toast({
         title: "Campo actualizado",
@@ -343,6 +421,74 @@ export default function DatabasePage() {
         variant: "destructive",
       })
     }
+  }
+
+  // Save database metadata
+  const saveDatabase = async () => {
+    if (!database) return
+    
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/virtual-schemas/${database.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editedName,
+          description: editedDescription,
+          configs: database.configs
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update database')
+      }
+
+      // Update local state
+      setDatabase({
+        ...database,
+        name: editedName,
+        description: editedDescription
+      })
+      
+      setHasUnsavedChanges(false)
+      
+      toast({
+        title: "Cambios guardados",
+        description: "La base de datos ha sido actualizada exitosamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los cambios",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Handle navigation with unsaved changes
+  const handleNavigation = (href: string) => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation(href)
+      setShowUnsavedDialog(true)
+    } else {
+      router.push(href)
+    }
+  }
+
+  const confirmNavigation = () => {
+    if (pendingNavigation) {
+      setHasUnsavedChanges(false)
+      router.push(pendingNavigation)
+    }
+    setShowUnsavedDialog(false)
+    setPendingNavigation(null)
+  }
+
+  const cancelNavigation = () => {
+    setShowUnsavedDialog(false)
+    setPendingNavigation(null)
   }
 
   // Delete entire database
@@ -412,6 +558,105 @@ export default function DatabasePage() {
     { value: "select", label: "Lista Desplegable" },
   ]
 
+  // Business data CRUD operations
+  const openDataDialog = (record: any = null) => {
+    if (record) {
+      setEditingRecord(record)
+      setRecordFormData(record.data_json || {})
+    } else {
+      setEditingRecord(null)
+      // Initialize form with default values for each field
+      const initialData: Record<string, any> = {}
+      selectedTable?.fields?.forEach((field) => {
+        if (field.type === 'boolean') {
+          initialData[field.name] = false
+        } else if (field.type === 'number') {
+          initialData[field.name] = 0
+        } else {
+          initialData[field.name] = ''
+        }
+      })
+      setRecordFormData(initialData)
+    }
+    setShowDataDialog(true)
+  }
+
+  const saveBusinessData = async () => {
+    if (!selectedTable) return
+    
+    try {
+      const url = editingRecord 
+        ? `/api/business-data/${editingRecord.id}` 
+        : '/api/business-data'
+      
+      const method = editingRecord ? 'PUT' : 'POST'
+      
+      const body = editingRecord
+        ? { data_json: recordFormData }
+        : {
+            user_id: 1, // TODO: Get from auth context
+            virtual_table_schema_id: selectedTable.id,
+            data_json: recordFormData
+          }
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to ${editingRecord ? 'update' : 'create'} record`)
+      }
+
+      toast({
+        title: editingRecord ? "Registro actualizado" : "Registro creado",
+        description: `El registro ha sido ${editingRecord ? 'actualizado' : 'creado'} exitosamente`,
+      })
+      
+      setShowDataDialog(false)
+      setEditingRecord(null)
+      setRecordFormData({})
+      
+      // Refresh data
+      fetchBusinessData(selectedTable.id)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `No se pudo ${editingRecord ? 'actualizar' : 'crear'} el registro`,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteBusinessData = async (recordId: number) => {
+    try {
+      const response = await fetch(`/api/business-data/${recordId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete record')
+      }
+
+      toast({
+        title: "Registro eliminado",
+        description: "El registro ha sido eliminado exitosamente",
+      })
+      
+      // Refresh data
+      if (selectedTable) {
+        fetchBusinessData(selectedTable.id)
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el registro",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen w-full flex-col">
@@ -455,10 +700,13 @@ export default function DatabasePage() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
-        <Link href="/dashboard/databases" className="flex items-center gap-2">
+        <button 
+          onClick={() => handleNavigation('/dashboard/databases')}
+          className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+        >
           <ArrowLeft className="h-4 w-4" />
           <span className="font-medium">Volver a Bases de Datos</span>
-        </Link>
+        </button>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
             Panel
@@ -474,13 +722,21 @@ export default function DatabasePage() {
           </Link>
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowPreview(true)}
+          >
             <Eye className="mr-2 h-4 w-4" />
             Vista Previa
           </Button>
-          <Button size="sm">
+          <Button 
+            size="sm"
+            onClick={saveDatabase}
+            disabled={!hasUnsavedChanges || isSaving}
+          >
             <Save className="mr-2 h-4 w-4" />
-            Guardar Cambios
+            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
         </div>
       </header>
@@ -508,7 +764,7 @@ export default function DatabasePage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() => {
-                          setSelectedTable(table)
+                          setSelectedTableForEdit(table)
                           setShowEditTableDialog(true)
                         }}
                       >
@@ -543,14 +799,18 @@ export default function DatabasePage() {
             <div className="space-y-2">
               <div className="space-y-1">
                 <Label htmlFor="db-name">Nombre de la Base de Datos</Label>
-                <Input id="db-name" value={database.name} readOnly />
+                <Input 
+                  id="db-name" 
+                  value={editedName} 
+                  onChange={(e) => setEditedName(e.target.value)}
+                />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="db-description">Descripción</Label>
                 <Textarea
                   id="db-description"
-                  value={database.description || ''}
-                  readOnly
+                  value={editedDescription}
+                  onChange={(e) => setEditedDescription(e.target.value)}
                   rows={3}
                 />
               </div>
@@ -653,12 +913,12 @@ export default function DatabasePage() {
                               </Button>
                               <Button 
                                 variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedTable(table)
-                                  setShowEditTableDialog(true)
-                                }}
-                              >
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTableForEdit(table)
+                                setShowEditTableDialog(true)
+                              }}
+                            >
                                 <Edit className="h-3 w-3 mr-1" />
                                 Editar
                               </Button>
@@ -748,7 +1008,7 @@ export default function DatabasePage() {
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuItem
                                         onClick={() => {
-                                          setSelectedField(field)
+                                          setSelectedFieldForEdit(field)
                                           setShowEditFieldDialog(true)
                                         }}
                                       >
@@ -777,26 +1037,127 @@ export default function DatabasePage() {
             </TabsContent>
 
             <TabsContent value="data" className="flex-1 p-4">
-              <div className="mx-auto max-w-[900px]">
+              <div className="mx-auto max-w-full">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Datos de la Base de Datos</CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle>Datos de la Base de Datos</CardTitle>
+                      {selectedTable && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Tabla: {selectedTable.name}
+                        </p>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" disabled={true}>
+                      {database?.tables && database.tables.length > 1 && (
+                        <Select
+                          value={selectedTable?.id.toString()}
+                          onValueChange={(value) => {
+                            const table = database.tables?.find(t => t.id === parseInt(value))
+                            if (table) setSelectedTable(table)
+                          }}
+                        >
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Seleccionar tabla" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {database.tables.map((table) => (
+                              <SelectItem key={table.id} value={table.id.toString()}>
+                                {table.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Button 
+                        size="sm"
+                        onClick={() => openDataDialog()}
+                        disabled={!selectedTable || !selectedTable.fields || selectedTable.fields.length === 0}
+                      >
                         <Plus className="h-4 w-4 mr-2" />
-                        Agregar Registro (Próximamente)
+                        Agregar Registro
                       </Button>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                        Próximamente
-                      </Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Los datos se mostrarán aquí cuando se conecten formularios</p>
-                      <p className="text-sm">o cuando se implemente la funcionalidad de datos</p>
-                    </div>
+                    {!selectedTable || !selectedTable.fields || selectedTable.fields.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Esta tabla no tiene campos definidos</p>
+                        <p className="text-sm">Agrega campos a la tabla para comenzar a almacenar datos</p>
+                      </div>
+                    ) : loadingData ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                        <p>Cargando datos...</p>
+                      </div>
+                    ) : businessData.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No hay registros en esta tabla</p>
+                        <p className="text-sm">Agrega tu primer registro para comenzar</p>
+                        <Button 
+                          className="mt-4"
+                          onClick={() => openDataDialog()}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Agregar Primer Registro
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {selectedTable.fields.map((field) => (
+                                <TableHead key={field.id}>{field.name}</TableHead>
+                              ))}
+                              <TableHead className="w-[100px]">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {businessData.map((record) => (
+                              <TableRow key={record.id}>
+                                {selectedTable.fields?.map((field) => (
+                                  <TableCell key={field.id}>
+                                    {field.type === 'boolean' 
+                                      ? (record.data_json[field.name] ? '✓' : '✗')
+                                      : record.data_json[field.name]?.toString() || '-'
+                                    }
+                                  </TableCell>
+                                ))}
+                                <TableCell>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => openDataDialog(record)}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Editar
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        className="text-destructive"
+                                        onClick={() => {
+                                          if (confirm('¿Estás seguro de que quieres eliminar este registro?')) {
+                                            deleteBusinessData(record.id)
+                                          }
+                                        }}
+                                      >
+                                        <Trash className="mr-2 h-4 w-4" />
+                                        Eliminar
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -872,8 +1233,8 @@ export default function DatabasePage() {
               <Label htmlFor="edit-table-name">Nombre de la Tabla</Label>
               <Input
                 id="edit-table-name"
-                value={selectedTable?.name || ""}
-                onChange={(e) => setSelectedTable(prev => prev ? { ...prev, name: e.target.value } : null)}
+                value={selectedTableForEdit?.name || ""}
+                onChange={(e) => setSelectedTableForEdit(prev => prev ? { ...prev, name: e.target.value } : null)}
                 placeholder="ej. Productos"
               />
             </div>
@@ -881,8 +1242,8 @@ export default function DatabasePage() {
               <Label htmlFor="edit-table-description">Descripción</Label>
               <Textarea
                 id="edit-table-description"
-                value={selectedTable?.description || ""}
-                onChange={(e) => setSelectedTable(prev => prev ? { ...prev, description: e.target.value } : null)}
+                value={selectedTableForEdit?.description || ""}
+                onChange={(e) => setSelectedTableForEdit(prev => prev ? { ...prev, description: e.target.value } : null)}
                 placeholder="¿Qué tipo de datos almacenará esta tabla?"
               />
             </div>
@@ -892,8 +1253,8 @@ export default function DatabasePage() {
               Cancelar
             </Button>
             <Button 
-              onClick={() => selectedTable && updateTable(selectedTable.id, selectedTable)}
-              disabled={!selectedTable?.name?.trim()}
+              onClick={() => selectedTableForEdit && updateTable(selectedTableForEdit.id, selectedTableForEdit)}
+              disabled={!selectedTableForEdit?.name?.trim()}
             >
               Actualizar Tabla
             </Button>
@@ -974,6 +1335,174 @@ export default function DatabasePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Unsaved Changes Dialog */}
+      <Dialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Descartar cambios?</DialogTitle>
+            <DialogDescription>
+              Tienes cambios sin guardar. Si sales ahora, perderás estos cambios.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelNavigation}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmNavigation}>
+              Descartar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Vista Previa: {database?.name}</DialogTitle>
+            <DialogDescription>
+              Previsualización de la estructura de datos
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {database?.tables?.map((table) => (
+              <div key={table.id} className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-3">{table.name}</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {table.fields?.map((field) => (
+                        <TableHead key={field.id}>{field.name}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      {table.fields?.map((field) => (
+                        <TableCell key={field.id} className="text-muted-foreground">
+                          {field.type === 'text' && 'Texto de ejemplo'}
+                          {field.type === 'number' && '123'}
+                          {field.type === 'email' && 'ejemplo@email.com'}
+                          {field.type === 'boolean' && 'Sí'}
+                          {field.type === 'datetime' && '2024-01-01 12:00'}
+                          {field.type === 'date' && '2024-01-01'}
+                          {field.type === 'id' && '1'}
+                          {!['text', 'number', 'email', 'boolean', 'datetime', 'date', 'id'].includes(field.type) && '-'}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Data Record Dialog */}
+      <Dialog open={showDataDialog} onOpenChange={setShowDataDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingRecord ? 'Editar Registro' : 'Agregar Nuevo Registro'}</DialogTitle>
+            <DialogDescription>
+              {editingRecord 
+                ? 'Modifica los valores del registro' 
+                : 'Completa los campos para crear un nuevo registro'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {selectedTable?.fields?.map((field) => (
+              <div key={field.id} className="space-y-2">
+                <Label htmlFor={`field-${field.id}`}>
+                  {field.name}
+                  {field.properties?.required && <span className="text-destructive ml-1">*</span>}
+                </Label>
+                {field.type === 'boolean' ? (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`field-${field.id}`}
+                      checked={recordFormData[field.name] || false}
+                      onCheckedChange={(checked) => 
+                        setRecordFormData({ ...recordFormData, [field.name]: checked })
+                      }
+                    />
+                    <Label htmlFor={`field-${field.id}`} className="text-sm font-normal">
+                      {field.properties?.description || field.name}
+                    </Label>
+                  </div>
+                ) : field.type === 'number' ? (
+                  <Input
+                    id={`field-${field.id}`}
+                    type="number"
+                    value={recordFormData[field.name] || ''}
+                    onChange={(e) => 
+                      setRecordFormData({ ...recordFormData, [field.name]: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder={field.properties?.description || `Ingrese ${field.name}`}
+                  />
+                ) : field.type === 'datetime' ? (
+                  <Input
+                    id={`field-${field.id}`}
+                    type="datetime-local"
+                    value={recordFormData[field.name] || ''}
+                    onChange={(e) => 
+                      setRecordFormData({ ...recordFormData, [field.name]: e.target.value })
+                    }
+                  />
+                ) : field.type === 'date' ? (
+                  <Input
+                    id={`field-${field.id}`}
+                    type="date"
+                    value={recordFormData[field.name] || ''}
+                    onChange={(e) => 
+                      setRecordFormData({ ...recordFormData, [field.name]: e.target.value })
+                    }
+                  />
+                ) : field.type === 'select' ? (
+                  <Select
+                    value={recordFormData[field.name] || ''}
+                    onValueChange={(value) => 
+                      setRecordFormData({ ...recordFormData, [field.name]: value })
+                    }
+                  >
+                    <SelectTrigger id={`field-${field.id}`}>
+                      <SelectValue placeholder="Seleccionar opción" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="opcion1">Opción 1</SelectItem>
+                      <SelectItem value="opcion2">Opción 2</SelectItem>
+                      <SelectItem value="opcion3">Opción 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id={`field-${field.id}`}
+                    type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : field.type === 'url' ? 'url' : 'text'}
+                    value={recordFormData[field.name] || ''}
+                    onChange={(e) => 
+                      setRecordFormData({ ...recordFormData, [field.name]: e.target.value })
+                    }
+                    placeholder={field.properties?.description || `Ingrese ${field.name}`}
+                  />
+                )}
+                {field.properties?.description && (
+                  <p className="text-xs text-muted-foreground">{field.properties.description}</p>
+                )}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDataDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveBusinessData}>
+              {editingRecord ? 'Actualizar' : 'Crear'} Registro
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Field Dialog */}
       <Dialog open={showEditFieldDialog} onOpenChange={setShowEditFieldDialog}>
         <DialogContent>
@@ -987,16 +1516,16 @@ export default function DatabasePage() {
                 <Label htmlFor="edit-field-name">Nombre del Campo</Label>
                 <Input
                   id="edit-field-name"
-                  value={selectedField?.name || ""}
-                  onChange={(e) => setSelectedField(prev => prev ? { ...prev, name: e.target.value } : null)}
+                  value={selectedFieldForEdit?.name || ""}
+                  onChange={(e) => setSelectedFieldForEdit(prev => prev ? { ...prev, name: e.target.value } : null)}
                   placeholder="ej. direccion_email"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-field-type">Tipo de Dato</Label>
                 <Select 
-                  value={selectedField?.type || "text"} 
-                  onValueChange={(value) => setSelectedField(prev => prev ? { ...prev, type: value } : null)}
+                  value={selectedFieldForEdit?.type || "text"} 
+                  onValueChange={(value) => setSelectedFieldForEdit(prev => prev ? { ...prev, type: value } : null)}
                 >
                   <SelectTrigger id="edit-field-type">
                     <SelectValue placeholder="Seleccionar tipo" />
@@ -1015,8 +1544,8 @@ export default function DatabasePage() {
               <Label htmlFor="edit-field-description">Descripción</Label>
               <Textarea
                 id="edit-field-description"
-                value={selectedField?.properties?.description || ""}
-                onChange={(e) => setSelectedField(prev => prev ? { 
+                value={selectedFieldForEdit?.properties?.description || ""}
+                onChange={(e) => setSelectedFieldForEdit(prev => prev ? { 
                   ...prev, 
                   properties: { ...prev.properties, description: e.target.value }
                 } : null)}
@@ -1027,8 +1556,8 @@ export default function DatabasePage() {
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="edit-field-required"
-                  checked={selectedField?.properties?.required || false}
-                  onCheckedChange={(checked) => setSelectedField(prev => prev ? { 
+                  checked={selectedFieldForEdit?.properties?.required || false}
+                  onCheckedChange={(checked) => setSelectedFieldForEdit(prev => prev ? { 
                     ...prev, 
                     properties: { ...prev.properties, required: checked === true }
                   } : null)}
@@ -1038,8 +1567,8 @@ export default function DatabasePage() {
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="edit-field-unique"
-                  checked={selectedField?.properties?.unique || false}
-                  onCheckedChange={(checked) => setSelectedField(prev => prev ? { 
+                  checked={selectedFieldForEdit?.properties?.unique || false}
+                  onCheckedChange={(checked) => setSelectedFieldForEdit(prev => prev ? { 
                     ...prev, 
                     properties: { ...prev.properties, unique: checked === true }
                   } : null)}
@@ -1053,8 +1582,8 @@ export default function DatabasePage() {
               Cancelar
             </Button>
             <Button 
-              onClick={() => selectedField && updateField(selectedField.id, selectedField)}
-              disabled={!selectedField?.name?.trim()}
+              onClick={() => selectedFieldForEdit && updateField(selectedFieldForEdit.id, selectedFieldForEdit)}
+              disabled={!selectedFieldForEdit?.name?.trim()}
             >
               Actualizar Campo
             </Button>

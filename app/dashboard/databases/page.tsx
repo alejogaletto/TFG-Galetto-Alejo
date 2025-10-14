@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface VirtualSchema {
   id: number
@@ -29,6 +31,11 @@ interface VirtualFieldSchema {
   id: number
   name: string
   type: string
+  properties?: {
+    required?: boolean
+    unique?: boolean
+    description?: string
+  }
 }
 
 export default function DatabasesPage() {
@@ -37,6 +44,8 @@ export default function DatabasesPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+  const [showSchemaPreview, setShowSchemaPreview] = useState(false)
+  const [selectedDatabase, setSelectedDatabase] = useState<VirtualSchema | null>(null)
 
   useEffect(() => {
     fetchDatabases()
@@ -488,7 +497,14 @@ export default function DatabasesPage() {
                           )}
                         </CardContent>
                         <CardFooter className="flex justify-between mt-auto">
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedDatabase(db)
+                              setShowSchemaPreview(true)
+                            }}
+                          >
                             Ver Esquema
                           </Button>
                           <Link href={`/dashboard/databases/${db.id}`}>
@@ -519,6 +535,70 @@ export default function DatabasesPage() {
           </div>
         </main>
       </div>
+
+      {/* Schema Preview Dialog */}
+      <Dialog open={showSchemaPreview} onOpenChange={setShowSchemaPreview}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedDatabase?.name}</DialogTitle>
+            <DialogDescription>
+              {selectedDatabase?.description || 'Sin descripción'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {selectedDatabase?.tables && selectedDatabase.tables.length > 0 ? (
+              selectedDatabase.tables.map((table) => (
+                <div key={table.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Database className="h-5 w-5 text-primary" />
+                      <h3 className="font-semibold text-lg">{table.name}</h3>
+                    </div>
+                    <Badge variant="outline">{table.fields?.length || 0} campos</Badge>
+                  </div>
+                  {table.fields && table.fields.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Requerido</TableHead>
+                          <TableHead>Único</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {table.fields.map((field) => (
+                          <TableRow key={field.id}>
+                            <TableCell className="font-medium">{field.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="capitalize">
+                                {field.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {field.properties?.required ? '✓' : '—'}
+                            </TableCell>
+                            <TableCell>
+                              {field.properties?.unique ? '✓' : '—'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No hay campos definidos</p>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">No hay tablas en esta base de datos</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

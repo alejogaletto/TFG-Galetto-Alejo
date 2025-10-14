@@ -37,6 +37,11 @@ export default function NewDatabasePage() {
   const [databaseName, setDatabaseName] = useState("")
   const [databaseDescription, setDatabaseDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [advancedSettings, setAdvancedSettings] = useState({
+    isPublic: false,
+    versioning: false,
+    storage: "cloud"
+  })
   const [showAddFieldDialog, setShowAddFieldDialog] = useState(false)
   const [showAddTableDialog, setShowAddTableDialog] = useState(false)
   const [selectedTableIndex, setSelectedTableIndex] = useState(0)
@@ -107,7 +112,10 @@ export default function NewDatabasePage() {
           configs: {
             type: databaseType,
             advanced_mode: advancedMode,
-            created_via: 'database_builder'
+            created_via: 'database_builder',
+            is_public: advancedSettings.isPublic,
+            versioning_enabled: advancedSettings.versioning,
+            storage_location: advancedSettings.storage
           }
         }),
       })
@@ -175,7 +183,7 @@ export default function NewDatabasePage() {
           name: field.name,
           type: field.type,
           virtual_table_schema_id: virtualTableSchemaId,
-          configs: {
+          properties: {
             required: field.required,
             unique: field.unique,
             description: field.description,
@@ -644,7 +652,11 @@ export default function NewDatabasePage() {
                             <Label htmlFor="public" className="cursor-pointer">
                               Hacer base de datos pública
                             </Label>
-                            <Switch id="public" />
+                            <Switch 
+                              id="public" 
+                              checked={advancedSettings.isPublic}
+                              onCheckedChange={(checked) => setAdvancedSettings({ ...advancedSettings, isPublic: checked })}
+                            />
                           </div>
                           <p className="text-xs text-muted-foreground">
                             Las bases de datos públicas pueden ser accedidas por cualquiera con el enlace.
@@ -655,7 +667,11 @@ export default function NewDatabasePage() {
                             <Label htmlFor="versioning" className="cursor-pointer">
                               Habilitar versionado
                             </Label>
-                            <Switch id="versioning" />
+                            <Switch 
+                              id="versioning" 
+                              checked={advancedSettings.versioning}
+                              onCheckedChange={(checked) => setAdvancedSettings({ ...advancedSettings, versioning: checked })}
+                            />
                           </div>
                           <p className="text-xs text-muted-foreground">
                             Rastrea cambios en tu base de datos a lo largo del tiempo.
@@ -663,7 +679,10 @@ export default function NewDatabasePage() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="storage">Ubicación de Almacenamiento</Label>
-                          <Select defaultValue="cloud">
+                          <Select 
+                            value={advancedSettings.storage} 
+                            onValueChange={(value) => setAdvancedSettings({ ...advancedSettings, storage: value })}
+                          >
                             <SelectTrigger id="storage">
                               <SelectValue placeholder="Seleccionar ubicación de almacenamiento" />
                             </SelectTrigger>

@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 import {
   ArrowLeft,
   Calendar,
@@ -46,12 +48,20 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 
 export default function DatabaseBuilderPage() {
-  const [databaseName, setDatabaseName] = useState("Nueva Base de Datos")
-  const [databaseDescription, setDatabaseDescription] = useState("Almacena y gestiona los datos de tu negocio")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
+  const databaseId = searchParams.get('id')
+  
+  const [loading, setLoading] = useState(true)
+  const [database, setDatabase] = useState<any>(null)
+  const [databaseName, setDatabaseName] = useState("")
+  const [databaseDescription, setDatabaseDescription] = useState("")
   const [activeTab, setActiveTab] = useState("structure")
   const [showPreview, setShowPreview] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
   const [showAddRelation, setShowAddRelation] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [newField, setNewField] = useState({
     name: "",
     type: "text",
@@ -61,35 +71,7 @@ export default function DatabaseBuilderPage() {
     description: "",
   })
 
-  const [tables, setTables] = useState([
-    {
-      id: 1,
-      name: "Customers",
-      description: "Store customer information",
-      fields: [
-        {
-          id: 1,
-          name: "id",
-          type: "id",
-          required: true,
-          unique: true,
-          isPrimary: true,
-          description: "Unique identifier",
-        },
-        { id: 2, name: "name", type: "text", required: true, unique: false, description: "Customer's full name" },
-        { id: 3, name: "email", type: "email", required: true, unique: true, description: "Customer's email address" },
-        { id: 4, name: "phone", type: "text", required: false, unique: false, description: "Customer's phone number" },
-        {
-          id: 5,
-          name: "created_at",
-          type: "datetime",
-          required: true,
-          unique: false,
-          description: "Date customer was added",
-        },
-      ],
-    },
-  ])
+  const [tables, setTables] = useState<any[]>([])
 
   const [relations, setRelations] = useState([
     {
@@ -103,12 +85,83 @@ export default function DatabaseBuilderPage() {
     },
   ])
 
-  const [availableTables, setAvailableTables] = useState([
-    { id: 1, name: "Customers" },
-    { id: 2, name: "Orders" },
-    { id: 3, name: "Products" },
-    { id: 4, name: "Categories" },
-  ])
+  useEffect(() => {
+    if (databaseId) {
+      fetchDatabase(databaseId)
+    } else {
+      setLoading(false)
+      toast({
+        title: "Error",
+        description: "No se proporcionó un ID de base de datos",
+        variant: "destructive",
+      })
+      router.push('/dashboard/databases')
+    }
+  }, [databaseId])
+
+  const fetchDatabase = async (id: string) => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/virtual-schemas/${id}/tree`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch database')
+      }
+      
+      const data = await response.json()
+      setDatabase(data)
+      setDatabaseName(data.name)
+      setDatabaseDescription(data.description || '')
+      setTables(data.tables || [])
+    } catch (error) {
+      console.error('Error fetching database:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la base de datos",
+        variant: "destructive",
+      })
+      router.push('/dashboard/databases')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const saveDatabase = async () => {
+    if (!database) return
+    
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/virtual-schemas/${database.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: databaseName,
+          description: databaseDescription,
+          configs: database.configs
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save database')
+      }
+
+      toast({
+        title: "Base de datos guardada",
+        description: "Los cambios han sido guardados exitosamente",
+      })
+      
+      // Redirect back to database detail page
+      router.push(`/dashboard/databases/${database.id}`)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los cambios",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const dataTypes = [
     { value: "text", label: "Text", icon: <Type className="h-4 w-4" /> },
@@ -127,51 +180,125 @@ export default function DatabaseBuilderPage() {
     { value: "many-to-many", label: "Many-to-Many" },
   ]
 
-  const addField = () => {
-    const currentTable = tables.find((table) => table.id === 1) // Currently only working with first table
-
+  const addField = async () => {
+    const currentTable = tables[0]
     if (!currentTable) return
 
-    const newId = Math.max(...currentTable.fields.map((field) => field.id)) + 1
-    const updatedFields = [...currentTable.fields, { ...newField, id: newId }]
+    try {
+      const response = await fetch('/api/virtual-field-schemas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newField.name,
+          type: newField.type,
+          virtual_table_schema_id: currentTable.id,
+          properties: {
+            required: newField.required,
+            unique: newField.unique,
+            description: newField.description,
+            created_via: 'database_builder'
+          }
+        })
+      })
 
-    setTables(tables.map((table) => (table.id === 1 ? { ...table, fields: updatedFields } : table)))
+      if (!response.ok) {
+        throw new Error('Failed to create field')
+      }
 
-    setNewField({
-      name: "",
-      type: "text",
-      required: false,
-      unique: false,
-      defaultValue: "",
-      description: "",
-    })
+      toast({
+        title: "Campo creado",
+        description: `El campo "${newField.name}" ha sido creado exitosamente`,
+      })
 
-    setShowAddField(false)
+      // Refresh database data
+      if (databaseId) {
+        await fetchDatabase(databaseId)
+      }
+
+      setNewField({
+        name: "",
+        type: "text",
+        required: false,
+        unique: false,
+        defaultValue: "",
+        description: "",
+      })
+
+      setShowAddField(false)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo crear el campo",
+        variant: "destructive",
+      })
+    }
   }
 
-  const removeField = (fieldId) => {
-    const currentTable = tables.find((table) => table.id === 1)
+  const removeField = async (fieldId: number) => {
+    try {
+      const response = await fetch(`/api/virtual-field-schemas/${fieldId}`, {
+        method: 'DELETE'
+      })
 
-    if (!currentTable) return
+      if (!response.ok) {
+        throw new Error('Failed to delete field')
+      }
 
-    const updatedFields = currentTable.fields.filter((field) => field.id !== fieldId)
+      toast({
+        title: "Campo eliminado",
+        description: "El campo ha sido eliminado exitosamente",
+      })
 
-    setTables(tables.map((table) => (table.id === 1 ? { ...table, fields: updatedFields } : table)))
+      // Refresh database data
+      if (databaseId) {
+        await fetchDatabase(databaseId)
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el campo",
+        variant: "destructive",
+      })
+    }
   }
 
-  const addRelation = (relation) => {
+  const addRelation = (relation: any) => {
     const newId = relations.length > 0 ? Math.max(...relations.map((rel) => rel.id)) + 1 : 1
     setRelations([...relations, { ...relation, id: newId }])
     setShowAddRelation(false)
   }
 
-  const removeRelation = (relationId) => {
+  const removeRelation = (relationId: any) => {
     setRelations(relations.filter((relation) => relation.id !== relationId))
   }
 
-  const getDataTypeIcon = (type) => {
+  const getDataTypeIcon = (type: any) => {
     const dataType = dataTypes.find((dt) => dt.value === type)
     return dataType ? dataType.icon : <Type className="h-4 w-4" />
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Cargando base de datos...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!database) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">Base de datos no encontrada</p>
+          <Button onClick={() => router.push('/dashboard/databases')}>
+            Volver a Bases de Datos
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -293,9 +420,9 @@ export default function DatabaseBuilderPage() {
               </div>
             </DialogContent>
           </Dialog>
-          <Button size="sm">
+          <Button size="sm" onClick={saveDatabase} disabled={isSaving || loading}>
             <Save className="mr-2 h-4 w-4" />
-            Guardar
+            {isSaving ? 'Guardando...' : 'Guardar'}
           </Button>
         </div>
       </header>
@@ -304,10 +431,10 @@ export default function DatabaseBuilderPage() {
           <div className="p-4 border-b">
             <h2 className="font-semibold mb-2">Tablas</h2>
             <div className="space-y-2">
-              {availableTables.map((table) => (
+              {tables.map((table, index) => (
                 <div
                   key={table.id}
-                  className={`flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted transition-colors ${table.id === 1 ? "bg-muted" : ""}`}
+                  className={`flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted transition-colors ${index === 0 ? "bg-muted" : ""}`}
                 >
                   <div className="flex items-center gap-2">
                     <Database className="h-4 w-4" />
@@ -318,10 +445,6 @@ export default function DatabaseBuilderPage() {
                   </Button>
                 </div>
               ))}
-              <Button variant="outline" size="sm" className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Tabla
-              </Button>
             </div>
           </div>
           <div className="p-4">
@@ -379,7 +502,7 @@ export default function DatabaseBuilderPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
             <div className="border-b">
               <div className="flex items-center px-4 py-2">
-                <h1 className="text-lg font-medium">Customers</h1>
+                <h1 className="text-lg font-medium">{tables[0]?.name || 'Sin tabla'}</h1>
                 <TabsList className="ml-auto">
                   <TabsTrigger value="structure">Estructura</TabsTrigger>
                   <TabsTrigger value="relations">Relaciones</TabsTrigger>
@@ -453,7 +576,7 @@ export default function DatabaseBuilderPage() {
                               <Checkbox
                                 id="field-required"
                                 checked={newField.required}
-                                onCheckedChange={(checked) => setNewField({ ...newField, required: checked })}
+                                onCheckedChange={(checked) => setNewField({ ...newField, required: checked === true })}
                               />
                               <Label htmlFor="field-required">Requerido</Label>
                             </div>
@@ -461,7 +584,7 @@ export default function DatabaseBuilderPage() {
                               <Checkbox
                                 id="field-unique"
                                 checked={newField.unique}
-                                onCheckedChange={(checked) => setNewField({ ...newField, unique: checked })}
+                                onCheckedChange={(checked) => setNewField({ ...newField, unique: checked === true })}
                               />
                               <Label htmlFor="field-unique">Único</Label>
                             </div>
@@ -498,10 +621,10 @@ export default function DatabaseBuilderPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {tables[0]?.fields.map((field) => (
+                        {tables[0]?.fields?.map((field: any) => (
                           <TableRow key={field.id}>
                             <TableCell className="font-medium">
-                              {field.isPrimary && <Key className="h-3 w-3 inline mr-1 text-amber-500" />}
+                              {field.properties?.is_primary && <Key className="h-3 w-3 inline mr-1 text-amber-500" />}
                               {field.name}
                             </TableCell>
                             <TableCell>
@@ -511,20 +634,20 @@ export default function DatabaseBuilderPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              {field.required ? (
+                              {field.properties?.required ? (
                                 <Check className="h-4 w-4 text-green-500" />
                               ) : (
                                 <Minus className="h-4 w-4 text-muted-foreground" />
                               )}
                             </TableCell>
                             <TableCell>
-                              {field.unique ? (
+                              {field.properties?.unique ? (
                                 <Check className="h-4 w-4 text-green-500" />
                               ) : (
                                 <Minus className="h-4 w-4 text-muted-foreground" />
                               )}
                             </TableCell>
-                            <TableCell>{field.description}</TableCell>
+                            <TableCell>{field.properties?.description || '-'}</TableCell>
                             <TableCell>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -540,7 +663,7 @@ export default function DatabaseBuilderPage() {
                                   <DropdownMenuItem
                                     className="text-destructive"
                                     onClick={() => removeField(field.id)}
-                                    disabled={field.isPrimary}
+                                    disabled={field.properties?.is_primary}
                                   >
                                     <Trash className="mr-2 h-4 w-4" />
                                     Eliminar
@@ -586,7 +709,7 @@ export default function DatabaseBuilderPage() {
                                   <SelectValue placeholder="Seleccionar tabla" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {availableTables.map((table) => (
+                                  {tables.map((table) => (
                                     <SelectItem key={table.id} value={table.name}>
                                       {table.name}
                                     </SelectItem>
@@ -614,7 +737,7 @@ export default function DatabaseBuilderPage() {
                                   <SelectValue placeholder="Seleccionar tabla" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {availableTables.map((table) => (
+                                  {tables.map((table) => (
                                     <SelectItem key={table.id} value={table.name}>
                                       {table.name}
                                     </SelectItem>

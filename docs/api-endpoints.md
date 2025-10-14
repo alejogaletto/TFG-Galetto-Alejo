@@ -96,7 +96,17 @@ Para información completa sobre el Constructor de Base de Datos, consulta la do
 ### Crear Esquema
 - **POST** `/api/virtual-schemas`
 - **Body**: `{ "name": "string", "description": "string", "user_id": "number", "configs": "object" }`
-- **Configs**: `{ "type": "customers|products|orders|tasks|blank", "advanced_mode": boolean, "created_via": "database_builder" }`
+- **Configs**: 
+  ```json
+  {
+    "type": "customers|products|orders|tasks|blank",
+    "advanced_mode": boolean,
+    "created_via": "database_builder",
+    "is_public": boolean,              // 🆕 Nueva
+    "versioning_enabled": boolean,      // 🆕 Nueva
+    "storage_location": "cloud|local|custom"  // 🆕 Nueva
+  }
+  ```
 
 ### Listar Esquemas
 - **GET** `/api/virtual-schemas`
@@ -144,8 +154,19 @@ Para información completa sobre el Constructor de Base de Datos, consulta la do
 
 ### Crear Campo
 - **POST** `/api/virtual-field-schemas`
-- **Body**: `{ "name": "string", "type": "string", "virtual_table_schema_id": "number", "configs": "object" }`
-- **Configs**: `{ "required": boolean, "unique": boolean, "description": "string", "is_primary": boolean, "created_via": "database_builder" }`
+- **Body**: `{ "name": "string", "type": "string", "virtual_table_schema_id": "number", "properties": "object" }`
+- **⚠️ Importante**: Usar `properties` (no `configs`) para compatibilidad con el esquema de BD
+- **Properties**: 
+  ```json
+  {
+    "required": boolean,
+    "unique": boolean,
+    "description": "string",
+    "is_primary": boolean,
+    "created_via": "database_builder"
+  }
+  ```
+- **Tipos disponibles**: `text`, `number`, `email`, `boolean`, `datetime`, `date`, `id`, `file`, `url`, `phone`, `select`
 
 ### Listar Campos
 - **GET** `/api/virtual-field-schemas`
@@ -203,20 +224,54 @@ Para información completa sobre el Constructor de Base de Datos, consulta la do
 
 ### Crear Registro
 - **POST** `/api/business-data`
-- **Body**: `{ "user_id": "number", "virtual_schema_id": "number", "data": "object" }`
+- **Body**: 
+  ```json
+  {
+    "user_id": number,
+    "virtual_table_schema_id": number,
+    "data_json": {
+      // Campos dinámicos basados en VirtualFieldSchemas
+      "nombre": "Juan Pérez",
+      "email": "juan@example.com",
+      "telefono": "123-456-7890",
+      ...
+    }
+  }
+  ```
+- **Nota**: `data_json` debe contener las claves que coincidan con los nombres de campos de la tabla
 
 ### Listar Registros
 - **GET** `/api/business-data`
-- **Query Params**: `user_id` o `virtual_schema_id` (opcional)
+- **Query Params**: `user_id` o `virtual_table_schema_id` (opcional)
+- **Respuesta**: Array de registros con `id`, `user_id`, `virtual_table_schema_id`, `data_json`, `creation_date`, `modification_date`
 
 ### Obtener Registro
 - **GET** `/api/business-data/[id]`
+- **Respuesta**: Registro específico con toda su metadata
 
 ### Actualizar Registro
 - **PUT** `/api/business-data/[id]`
+- **Body**: 
+  ```json
+  {
+    "data_json": {
+      // Solo los campos a actualizar
+      "email": "nuevo@email.com",
+      "telefono": "987-654-3210"
+    }
+  }
+  ```
+- **Nota**: `modification_date` se actualiza automáticamente
 
 ### Eliminar Registro
 - **DELETE** `/api/business-data/[id]`
+- **Respuesta**: `204 No Content` en caso de éxito
+
+### Validación de Datos
+- Los valores en `data_json` deben coincidir con los tipos definidos en `VirtualFieldSchema`
+- Campos marcados como `required` deben estar presentes
+- Campos marcados como `unique` deben ser únicos en la tabla
+- El sistema valida automáticamente los tipos de datos
 
 ## Flujos de Trabajo (Workflows)
 
