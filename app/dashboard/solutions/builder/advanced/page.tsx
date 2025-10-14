@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   ArrowLeft,
   Plus,
@@ -58,13 +58,16 @@ import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRo
 
 export default function AdvancedSolutionBuilder() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [solutionName, setSolutionName] = useState("Mi Solución Personalizada")
+  const [solutionId, setSolutionId] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState(null)
   const [previewMode, setPreviewMode] = useState(false)
   const [showDataSourceDialog, setShowDataSourceDialog] = useState(false)
   const [showComponentConfig, setShowComponentConfig] = useState(false)
   const [isNewSolution, setIsNewSolution] = useState(false)
   const [templateType, setTemplateType] = useState("")
+  const [userId, setUserId] = useState<number | null>(null)
 
   // Inicializar desde parámetros URL
   useEffect(() => {
@@ -72,10 +75,12 @@ export default function AdvancedSolutionBuilder() {
     const description = searchParams.get("description")
     const isNew = searchParams.get("new") === "true"
     const template = searchParams.get("template")
+    const id = searchParams.get("id")
 
     if (name) setSolutionName(name)
     if (isNew) setIsNewSolution(true)
     if (template) setTemplateType(template)
+    if (id) setSolutionId(id)
   }, [searchParams])
 
   // Componentes disponibles para arrastrar
@@ -162,49 +167,92 @@ export default function AdvancedSolutionBuilder() {
     },
   ]
 
-  // Fuentes de datos disponibles
-  const dataSources = [
-    {
-      id: "customers",
-      name: "Clientes",
-      type: "database",
-      table: "customers",
-      fields: ["id", "name", "email", "phone", "company", "status", "created_at", "value"],
-      description: "Base de datos de clientes del CRM",
-    },
-    {
-      id: "products",
-      name: "Productos",
-      type: "database",
-      table: "products",
-      fields: ["id", "sku", "name", "category", "brand", "price", "stock", "min_stock", "location"],
-      description: "Inventario de productos",
-    },
-    {
-      id: "orders",
-      name: "Pedidos",
-      type: "database",
-      table: "orders",
-      fields: ["id", "customer_id", "total", "status", "created_at", "items"],
-      description: "Pedidos y ventas",
-    },
-    {
-      id: "activities",
-      name: "Actividades",
-      type: "database",
-      table: "activities",
-      fields: ["id", "type", "description", "user", "timestamp", "reference"],
-      description: "Log de actividades del sistema",
-    },
-    {
-      id: "analytics",
-      name: "Analíticas",
-      type: "api",
-      endpoint: "/api/analytics",
-      fields: ["metric", "value", "period", "change"],
-      description: "Datos de analíticas y métricas",
-    },
-  ]
+  // Fuentes de datos disponibles - ahora dinámicas
+  const [dataSources, setDataSources] = useState<any[]>([])
+  const [forms, setForms] = useState<any[]>([])
+  const [workflows, setWorkflows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch real data sources, forms, and workflows
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        
+        // Get user from localStorage
+        const userStr = localStorage.getItem("user")
+        const user = userStr ? JSON.parse(userStr) : null
+        const currentUserId = user?.id || 1
+        setUserId(currentUserId)
+
+        // Fetch Virtual Schemas with tables and fields
+        const schemasRes = await fetch(`/api/virtual-schemas?user_id=${currentUserId}&includeTree=true`)
+        if (schemasRes.ok) {
+          const schemas = await schemasRes.json()
+          
+          // Transform to dataSources format
+          const sources = schemas.flatMap((schema: any) => 
+            (schema.tables || []).map((table: any) => ({
+              id: `table-${table.id}`,
+              name: table.name,
+              type: 'database',
+              schemaId: schema.id,
+              tableId: table.id,
+              fields: (table.fields || []).map((f: any) => f.name),
+              description: table.description || schema.name
+            }))
+          )
+          setDataSources(sources)
+        }
+
+        // Fetch Forms
+        const formsRes = await fetch('/api/forms')
+        if (formsRes.ok) {
+          const formsData = await formsRes.json()
+          setForms(formsData || [])
+        }
+
+        // Fetch Workflows
+        const workflowsRes = await fetch('/api/workflows')
+        if (workflowsRes.ok) {
+          const workflowsData = await workflowsRes.json()
+          setWorkflows(workflowsData || [])
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  // Load saved solution if editing existing
+  useEffect(() => {
+    const loadSolution = async () => {
+      if (!solutionId) return
+
+      try {
+        const response = await fetch(`/api/solutions/${solutionId}?includeComponents=true`)
+        if (response.ok) {
+          const solution = await response.json()
+
+          if (solution.configs?.canvas) {
+            setCanvasComponents(solution.configs.canvas)
+            setHistory([solution.configs.canvas])
+            setHistoryIndex(0)
+          }
+
+          if (solution.name) setSolutionName(solution.name)
+        }
+      } catch (error) {
+        console.error('Error loading solution:', error)
+      }
+    }
+
+    loadSolution()
+  }, [solutionId])
 
   // Función para obtener componentes iniciales según la plantilla
   const getInitialComponents = (template: string) => {
@@ -430,6 +478,82 @@ export default function AdvancedSolutionBuilder() {
       setCanvasComponents(updated)
       updateHistory(updated)
     }
+  }
+
+  // Save functionality
+  const handleSave = async () => {
+    if (!solutionId) {
+      alert('No se encontró el ID de la solución')
+      return
+    }
+
+    try {
+      // 1. Save canvas layout to Solution.configs
+      const layoutConfig = {
+        canvas: canvasComponents,
+        lastModified: new Date().toISOString()
+      }
+
+      const updateResponse = await fetch(`/api/solutions/${solutionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          configs: layoutConfig,
+          status: 'active'
+        })
+      })
+
+      if (!updateResponse.ok) {
+        throw new Error('Error updating solution')
+      }
+
+      // 2. Delete existing solution components to avoid duplicates
+      const existingComponents = await fetch(`/api/solution-components?solution_id=${solutionId}`)
+      if (existingComponents.ok) {
+        const existing = await existingComponents.json()
+        for (const comp of existing) {
+          await fetch(`/api/solution-components?id=${comp.id}`, {
+            method: 'DELETE'
+          })
+        }
+      }
+
+      // 3. Create SolutionComponent links for each component with data source
+      for (const component of canvasComponents) {
+        const config = component.config as any
+        if (config.tableId || config.formId || config.workflowId) {
+          const componentType = config.tableId ? 'virtual_schema' : 
+                              config.formId ? 'form' : 'workflow'
+          const componentId = config.tableId || config.formId || config.workflowId
+
+          await fetch('/api/solution-components', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              solution_id: parseInt(solutionId),
+              component_type: componentType,
+              component_id: parseInt(componentId),
+              configs: {
+                canvas_component_id: component.id,
+                canvas_config: component.config
+              }
+            })
+          })
+        }
+      }
+
+      alert('Solución guardada exitosamente')
+      router.push(`/dashboard/solutions/${solutionId}`)
+    } catch (error) {
+      console.error('Error saving solution:', error)
+      alert('Error al guardar la solución')
+    }
+  }
+
+  // Preview mode toggle
+  const togglePreviewMode = () => {
+    setPreviewMode(!previewMode)
+    setSelectedCanvasComponent(null)
   }
 
   const renderComponentPreview = (component: any) => {
@@ -688,26 +812,101 @@ export default function AdvancedSolutionBuilder() {
           <Label htmlFor="data-source">Fuente de Datos</Label>
           <Select
             value={component.config.dataSource || ""}
-            onValueChange={(value) => updateComponentConfig(component.id, { dataSource: value })}
+            onValueChange={(value) => {
+              const selectedSource = dataSources.find(ds => ds.id === value)
+              updateComponentConfig(component.id, { 
+                dataSource: value,
+                tableId: selectedSource?.tableId,
+                schemaId: selectedSource?.schemaId
+              })
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Seleccionar fuente de datos" />
             </SelectTrigger>
             <SelectContent>
-              {dataSources.map((source) => (
-                <SelectItem key={source.id} value={source.id}>
-                  <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">{source.name}</div>
-                      <div className="text-xs text-muted-foreground">{source.description}</div>
+              {dataSources.length > 0 ? (
+                dataSources.map((source) => (
+                  <SelectItem key={source.id} value={source.id}>
+                    <div className="flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">{source.name}</div>
+                        <div className="text-xs text-muted-foreground">{source.description}</div>
+                      </div>
                     </div>
-                  </div>
-                </SelectItem>
-              ))}
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="p-2 text-sm text-muted-foreground">
+                  No hay bases de datos disponibles
+                </div>
+              )}
             </SelectContent>
           </Select>
         </div>
+
+        {/* Form selector for form-related components */}
+        {(component.type === "form" || component.type === "form-embed") && (
+          <div>
+            <Label htmlFor="form-select">Formulario</Label>
+            <Select
+              value={(component.config as any).formId?.toString() || ""}
+              onValueChange={(value) => updateComponentConfig(component.id, { formId: parseInt(value) })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar formulario" />
+              </SelectTrigger>
+              <SelectContent>
+                {forms.length > 0 ? (
+                  forms.map((form) => (
+                    <SelectItem key={form.id} value={form.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span>{form.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-2 text-sm text-muted-foreground">
+                    No hay formularios disponibles
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Workflow selector for automation components */}
+        {component.type === "workflow-trigger" && (
+          <div>
+            <Label htmlFor="workflow-select">Flujo de Trabajo</Label>
+            <Select
+              value={(component.config as any).workflowId?.toString() || ""}
+              onValueChange={(value) => updateComponentConfig(component.id, { workflowId: parseInt(value) })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar flujo" />
+              </SelectTrigger>
+              <SelectContent>
+                {workflows.length > 0 ? (
+                  workflows.map((workflow) => (
+                    <SelectItem key={workflow.id} value={workflow.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        <span>{workflow.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-2 text-sm text-muted-foreground">
+                    No hay flujos disponibles
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {component.type === "data-table" && (
           <div>
@@ -715,7 +914,7 @@ export default function AdvancedSolutionBuilder() {
             <div className="space-y-2 mt-2">
               {dataSources
                 .find((ds) => ds.id === component.config.dataSource)
-                ?.fields.map((field) => (
+                ?.fields.map((field: string) => (
                   <div key={field} className="flex items-center space-x-2">
                     <Switch
                       id={`field-${field}`}
@@ -751,7 +950,7 @@ export default function AdvancedSolutionBuilder() {
                 <SelectContent>
                   {dataSources
                     .find((ds) => ds.id === component.config.dataSource)
-                    ?.fields.map((field) => (
+                    ?.fields.map((field: string) => (
                       <SelectItem key={field} value={field}>
                         {field.replace("_", " ")}
                       </SelectItem>
@@ -930,11 +1129,11 @@ export default function AdvancedSolutionBuilder() {
                 <Redo className="mr-2 h-4 w-4" />
                 Rehacer
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setPreviewMode(!previewMode)}>
+              <Button variant="outline" size="sm" onClick={togglePreviewMode}>
                 <Eye className="mr-2 h-4 w-4" />
                 {previewMode ? "Editar" : "Vista Previa"}
               </Button>
-              <Button size="sm">
+              <Button size="sm" onClick={handleSave}>
                 <Save className="mr-2 h-4 w-4" />
                 Guardar
               </Button>
@@ -1294,7 +1493,7 @@ export default function AdvancedSolutionBuilder() {
                                         <h4 className="font-medium text-sm">{source.name}</h4>
                                         <p className="text-xs text-muted-foreground mb-2">{source.description}</p>
                                         <div className="flex flex-wrap gap-1">
-                                          {source.fields.slice(0, 3).map((field) => (
+                                          {source.fields.slice(0, 3).map((field: string) => (
                                             <Badge key={field} variant="outline" className="text-xs">
                                               {field}
                                             </Badge>

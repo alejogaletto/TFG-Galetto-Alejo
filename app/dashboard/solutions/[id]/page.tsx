@@ -52,37 +52,14 @@ export default function SolutionDetailPage() {
   const router = useRouter()
   const solutionId = params?.id
 
-  // Detectar el tipo de solución basado en el ID o datos
-  useEffect(() => {
-    // Simulamos la detección del tipo de solución
-    // En una implementación real, esto vendría de la base de datos
-    const solutionType = getSolutionType(solutionId)
-
-    if (solutionType === "inventario") {
-      router.push(`/dashboard/solutions/${solutionId}/inventory`)
-      return
-    }
-    // Si es CRM o no se especifica, continúa con la vista actual
-  }, [solutionId, router])
-
-  // Función para determinar el tipo de solución
-  const getSolutionType = (id) => {
-    // Simulamos diferentes tipos basados en el ID
-    // En producción esto vendría de la base de datos
-    const solutionTypes = {
-      "1": "crm",
-      "2": "inventario",
-      "3": "crm",
-      "4": "inventario",
-      inventario: "inventario",
-      inventory: "inventario",
-    }
-
-    return solutionTypes[id] || "crm"
-  }
+  // Dynamic solution state
+  const [solution, setSolution] = useState<any>(null)
+  const [canvasComponents, setCanvasComponents] = useState<any[]>([])
+  const [componentsData, setComponentsData] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(true)
 
   // Actualizar la función formatCurrency para usar pesos argentinos
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
@@ -91,8 +68,70 @@ export default function SolutionDetailPage() {
     }).format(amount)
   }
 
-  // Actualizar los valores monetarios en los datos simulados del CRM para reflejar pesos argentinos
-  const [solution, setSolution] = useState({
+  // Fetch solution and its data
+  useEffect(() => {
+    const fetchSolution = async () => {
+      if (!solutionId) return
+
+      try {
+        setLoading(true)
+        
+        // Fetch solution with components
+        const response = await fetch(`/api/solutions/${solutionId}?includeComponents=true`)
+        if (!response.ok) {
+          throw new Error('Solution not found')
+        }
+        
+        const data = await response.json()
+        setSolution(data)
+
+        // Check if it's inventory type and redirect
+        if (data.template_type === 'inventario' || data.template_type === 'inventory') {
+          router.push(`/dashboard/solutions/${solutionId}/inventory`)
+          return
+        }
+
+        // Load canvas from configs
+        if (data.configs?.canvas) {
+          setCanvasComponents(data.configs.canvas)
+          
+          // Fetch actual data for each component
+          await fetchComponentsData(data.configs.canvas)
+        }
+      } catch (error) {
+        console.error('Error loading solution:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSolution()
+  }, [solutionId, router])
+
+  // Fetch data for components
+  const fetchComponentsData = async (components: any[]) => {
+    const dataMap: Record<string, any> = {}
+
+    for (const component of components) {
+      if (component.config.tableId) {
+        try {
+          // Fetch from BusinessData
+          const res = await fetch(`/api/business-data?virtual_table_schema_id=${component.config.tableId}`)
+          if (res.ok) {
+            const data = await res.json()
+            dataMap[component.id] = data
+          }
+        } catch (error) {
+          console.error(`Error fetching data for component ${component.id}:`, error)
+        }
+      }
+    }
+
+    setComponentsData(dataMap)
+  }
+
+  // Fallback to old hardcoded data structure for backwards compatibility
+  const [fallbackSolution] = useState({
     id: solutionId,
     name: "Sistema CRM",
     description: "Gestión completa de relaciones con clientes",
@@ -275,7 +314,7 @@ export default function SolutionDetailPage() {
     },
   ])
 
-  const getIcon = (iconName) => {
+  const getIcon = (iconName: string) => {
     switch (iconName) {
       case "users":
         return <Users className="h-6 w-6" />
@@ -302,7 +341,7 @@ export default function SolutionDetailPage() {
     }
   }
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "nuevo":
         return "bg-blue-100 text-blue-800"
@@ -321,7 +360,7 @@ export default function SolutionDetailPage() {
     }
   }
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "nuevo":
         return <AlertCircle className="h-4 w-4" />
@@ -340,7 +379,7 @@ export default function SolutionDetailPage() {
     }
   }
 
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "alta":
         return "bg-red-100 text-red-800"
@@ -353,7 +392,7 @@ export default function SolutionDetailPage() {
     }
   }
 
-  const getActivityIcon = (type) => {
+  const getActivityIcon = (type: string) => {
     switch (type) {
       case "llamada":
         return <Phone className="h-4 w-4" />
@@ -370,10 +409,126 @@ export default function SolutionDetailPage() {
     }
   }
 
-  const executeAutomatedTask = (taskId) => {
+  const executeAutomatedTask = (taskId: number) => {
     console.log(`Ejecutando tarea automática ${taskId}`)
     setAutomatedTasks((prev) => prev.filter((task) => task.id !== taskId))
   }
+
+  // Render component with real data
+  const renderComponentWithData = (component: any, data: any) => {
+    switch (component.type) {
+      case "stat-card":
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{component.config.title}</CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {data?.length || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {data?.length > 0 ? 'registros totales' : 'Sin datos'}
+              </p>
+            </CardContent>
+          </Card>
+        )
+
+      case "data-table":
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {component.config.columns?.map((col: string) => (
+                      <TableHead key={col}>{col}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(data || []).slice(0, 10).map((row: any, idx: number) => (
+                    <TableRow key={idx}>
+                      {component.config.columns?.map((col: string) => (
+                        <TableCell key={col}>
+                          {row.data_json?.[col] || '-'}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )
+
+      case "chart-bar":
+      case "chart-pie":
+      case "chart-line":
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Gráfico con {data?.length || 0} datos
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )
+
+      case "progress-bar":
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Progress value={data?.length || 0} className="w-full" />
+              <p className="text-xs text-muted-foreground mt-2">
+                {data?.length || 0}%
+              </p>
+            </CardContent>
+          </Card>
+        )
+
+      default:
+        return (
+          <Card>
+            <CardContent className="flex items-center justify-center h-32">
+              <p className="text-sm text-muted-foreground">
+                {component.config.title || 'Componente'}
+              </p>
+            </CardContent>
+          </Card>
+        )
+    }
+  }
+
+  // If loading, show loading state
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Cargando solución...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Use solution or fallback
+  const displaySolution = solution || fallbackSolution
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -384,9 +539,9 @@ export default function SolutionDetailPage() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">{getIcon(solution.icon)}</div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">{getIcon(displaySolution.icon)}</div>
             <div>
-              <h1 className="font-semibold">{solution.name}</h1>
+              <h1 className="font-semibold">{displaySolution.name}</h1>
             </div>
           </div>
         </div>
@@ -426,17 +581,44 @@ export default function SolutionDetailPage() {
       </header>
 
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        {/* Estadísticas Principales */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Render custom canvas if available, otherwise show default CRM view */}
+        {canvasComponents.length > 0 ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">{displaySolution.name}</h2>
+              <Button variant="outline" asChild>
+                <Link href={`/dashboard/solutions/builder/advanced?id=${solutionId}`}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar Dashboard
+                </Link>
+              </Button>
+            </div>
+            
+            <div className="grid gap-4 grid-cols-4">
+              {canvasComponents.map((component) => (
+                <div 
+                  key={component.id} 
+                  className={`col-span-${component.size?.width || 1}`}
+                  style={{ gridColumn: `span ${component.size?.width || 1}` }}
+                >
+                  {renderComponentWithData(component, componentsData[component.id])}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Estadísticas Principales - Fallback hardcoded view */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{solution.stats.totalLeads}</div>
+              <div className="text-2xl font-bold">{fallbackSolution.stats.totalLeads}</div>
               <p className="text-xs text-muted-foreground flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />+{solution.stats.monthlyGrowth}% este mes
+                <TrendingUp className="h-3 w-3 mr-1" />+{fallbackSolution.stats.monthlyGrowth}% este mes
               </p>
             </CardContent>
           </Card>
@@ -446,9 +628,9 @@ export default function SolutionDetailPage() {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{solution.stats.activeLeads}</div>
+              <div className="text-2xl font-bold">{fallbackSolution.stats.activeLeads}</div>
               <p className="text-xs text-muted-foreground">
-                {Math.round((solution.stats.activeLeads / solution.stats.totalLeads) * 100)}% del total
+                {Math.round((fallbackSolution.stats.activeLeads / fallbackSolution.stats.totalLeads) * 100)}% del total
               </p>
             </CardContent>
           </Card>
@@ -458,8 +640,8 @@ export default function SolutionDetailPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{solution.stats.conversionRate}%</div>
-              <Progress value={solution.stats.conversionRate} className="mt-2" />
+              <div className="text-2xl font-bold">{fallbackSolution.stats.conversionRate}%</div>
+              <Progress value={fallbackSolution.stats.conversionRate} className="mt-2" />
             </CardContent>
           </Card>
           <Card>
@@ -468,9 +650,9 @@ export default function SolutionDetailPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(solution.stats.totalRevenue)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(fallbackSolution.stats.totalRevenue)}</div>
               <p className="text-xs text-muted-foreground">
-                Promedio: {formatCurrency(solution.stats.avgDealSize)} por deal
+                Promedio: {formatCurrency(fallbackSolution.stats.avgDealSize)} por deal
               </p>
             </CardContent>
           </Card>
@@ -835,6 +1017,8 @@ export default function SolutionDetailPage() {
             </div>
           </TabsContent>
         </Tabs>
+          </>
+        )}
       </main>
     </div>
   )
