@@ -319,6 +319,68 @@ Para información completa sobre el Constructor de Base de Datos, consulta la do
 ### Eliminar Paso
 - **DELETE** `/api/workflow-steps/[id]`
 
+## Conexiones de Datos (DataConnections)
+
+### Crear/Actualizar Conexión de Datos
+- **POST** `/api/data-connections`
+- **Body**: 
+```json
+{
+  "form_id": 123,
+  "virtual_schema_id": 456,
+  "virtual_table_schema_id": 789,
+  "configs": {}
+}
+```
+- **Descripción**: Crea una nueva conexión de datos o actualiza una existente para el formulario
+- **Nota**: Si ya existe una conexión para el form_id, se actualiza
+
+### Obtener Conexión de Datos
+- **GET** `/api/data-connections?form_id=123`
+- **Respuesta**: Conexión de datos para el formulario especificado (o null si no existe)
+
+### Listar Conexiones
+- **GET** `/api/data-connections`
+- **Respuesta**: Lista de todas las conexiones de datos
+
+## Mapeo de Campos (FieldMappings)
+
+### Crear/Actualizar Mapeos (Batch)
+- **POST** `/api/field-mappings`
+- **Body**: 
+```json
+[
+  {
+    "data_connection_id": 1,
+    "form_field_id": 10,
+    "virtual_field_schema_id": 20,
+    "changes": null
+  },
+  {
+    "data_connection_id": 1,
+    "form_field_id": 11,
+    "virtual_field_schema_id": 21,
+    "changes": null
+  }
+]
+```
+- **Descripción**: Crea o actualiza mapeos de campos en batch
+- **Nota**: Elimina mapeos existentes del data_connection_id antes de insertar los nuevos
+
+### Obtener Mapeos
+- **GET** `/api/field-mappings?data_connection_id=1`
+- **Respuesta**: Lista de mapeos de campos para la conexión especificada
+
+### Listar Todos los Mapeos
+- **GET** `/api/field-mappings`
+- **Respuesta**: Lista de todos los mapeos de campos
+
+### Eliminar Mapeos
+- **DELETE** `/api/field-mappings?data_connection_id=1`
+- **Descripción**: Elimina todos los mapeos para una conexión específica
+- **DELETE** `/api/field-mappings?id=1`
+- **Descripción**: Elimina un mapeo específico por ID
+
 ## Envíos de Formularios (FormSubmissions)
 
 ### Enviar Formulario

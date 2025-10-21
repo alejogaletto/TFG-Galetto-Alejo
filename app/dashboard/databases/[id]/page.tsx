@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { 
@@ -75,6 +75,11 @@ export default function DatabasePage() {
   const [showPreview, setShowPreview] = useState(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  
+  // Sidebar resize state
+  const [sidebarWidth, setSidebarWidth] = useState(250)
+  const [isResizing, setIsResizing] = useState(false)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   
   // State for adding/editing tables and fields
   const [showAddTableDialog, setShowAddTableDialog] = useState(false)
@@ -176,18 +181,22 @@ export default function DatabasePage() {
   const fetchBusinessData = async (tableId: number) => {
     try {
       setLoadingData(true)
-      const response = await fetch('/api/business-data')
+      console.log('🔍 Fetching business data for table ID:', tableId)
+      
+      // Fetch data filtered by table ID
+      const response = await fetch(`/api/business-data?virtual_table_schema_id=${tableId}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch business data')
       }
       
-      const allData = await response.json()
-      // Filter data for the selected table
-      const tableData = allData.filter((record: any) => record.virtual_table_schema_id === tableId)
+      const tableData = await response.json()
+      console.log('📊 Business data received:', tableData)
+      console.log('📊 Number of records:', tableData.length)
+      
       setBusinessData(tableData)
     } catch (error) {
-      console.error('Error fetching business data:', error)
+      console.error('❌ Error fetching business data:', error)
       toast({
         title: "Error",
         description: "No se pudieron cargar los datos",
@@ -203,6 +212,35 @@ export default function DatabasePage() {
       fetchBusinessData(selectedTable.id)
     }
   }, [selectedTable, activeTab])
+
+  // Sidebar resize handlers
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+      const newWidth = e.clientX
+      if (newWidth >= 200 && newWidth <= 500) {
+        setSidebarWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
 
   // CRUD functions for tables
   const createTable = async () => {
@@ -742,18 +780,22 @@ export default function DatabasePage() {
       </header>
 
       <div className="flex flex-1">
-        <aside className="w-[250px] flex-col border-r bg-muted/40 md:flex overflow-auto">
+        <aside 
+          ref={sidebarRef}
+          className="flex-col border-r bg-muted/40 md:flex overflow-auto relative"
+          style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '500px' }}
+        >
           <div className="p-4 border-b">
-            <h2 className="font-semibold mb-2">Tablas</h2>
+            <h2 className="font-semibold mb-2 text-sm">Tablas</h2>
             <div className="space-y-2">
               {database.tables?.map((table) => (
                 <div
                   key={table.id}
                   className="flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-muted transition-colors"
                 >
-                  <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    <span>{table.name}</span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Database className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm truncate">{table.name}</span>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -795,30 +837,32 @@ export default function DatabasePage() {
           </div>
           
           <div className="p-4">
-            <h2 className="font-semibold mb-2">Configuración de la Base de Datos</h2>
+            <h2 className="font-semibold mb-2 text-sm">Configuración de la Base de Datos</h2>
             <div className="space-y-2">
               <div className="space-y-1">
-                <Label htmlFor="db-name">Nombre de la Base de Datos</Label>
+                <Label htmlFor="db-name" className="text-xs">Nombre de la Base de Datos</Label>
                 <Input 
                   id="db-name" 
                   value={editedName} 
                   onChange={(e) => setEditedName(e.target.value)}
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="db-description">Descripción</Label>
+                <Label htmlFor="db-description" className="text-xs">Descripción</Label>
                 <Textarea
                   id="db-description"
                   value={editedDescription}
                   onChange={(e) => setEditedDescription(e.target.value)}
                   rows={3}
+                  className="text-sm"
                 />
               </div>
             </div>
           </div>
 
           <div className="p-4 border-t">
-            <h3 className="font-medium mb-2">Formularios Conectados</h3>
+            <h3 className="font-medium mb-2 text-sm">Formularios Conectados</h3>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="w-full" disabled={true}>
@@ -832,6 +876,17 @@ export default function DatabasePage() {
             </div>
           </div>
         </aside>
+        
+        {/* Resize Handle */}
+        <div
+          className="w-1 bg-border hover:bg-primary/50 cursor-col-resize transition-colors relative group"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            setIsResizing(true)
+          }}
+        >
+          <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-primary/10" />
+        </div>
 
         <main className="flex flex-1 flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
@@ -1109,23 +1164,39 @@ export default function DatabasePage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              {selectedTable.fields.map((field) => (
-                                <TableHead key={field.id}>{field.name}</TableHead>
-                              ))}
+                              <TableHead className="w-[80px]">ID</TableHead>
+                              <TableHead className="w-[180px]">Created At</TableHead>
+                              {selectedTable.fields
+                                .filter((field) => field.name.toLowerCase() !== 'id' && field.name.toLowerCase() !== 'created at' && field.name.toLowerCase() !== 'created_at')
+                                .map((field) => (
+                                  <TableHead key={field.id}>{field.name}</TableHead>
+                                ))}
                               <TableHead className="w-[100px]">Acciones</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {businessData.map((record) => (
                               <TableRow key={record.id}>
-                                {selectedTable.fields?.map((field) => (
-                                  <TableCell key={field.id}>
-                                    {field.type === 'boolean' 
-                                      ? (record.data_json[field.name] ? '✓' : '✗')
-                                      : record.data_json[field.name]?.toString() || '-'
-                                    }
-                                  </TableCell>
-                                ))}
+                                <TableCell className="font-mono text-sm">{record.id}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {new Date(record.creation_date).toLocaleString('es-ES', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </TableCell>
+                                {selectedTable.fields
+                                  ?.filter((field) => field.name.toLowerCase() !== 'id' && field.name.toLowerCase() !== 'created at' && field.name.toLowerCase() !== 'created_at')
+                                  .map((field) => (
+                                    <TableCell key={field.id}>
+                                      {field.type === 'boolean' 
+                                        ? (record.data_json[field.name] ? '✓' : '✗')
+                                        : record.data_json[field.name]?.toString() || '-'
+                                      }
+                                    </TableCell>
+                                  ))}
                                 <TableCell>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -1412,7 +1483,15 @@ export default function DatabasePage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {selectedTable?.fields?.map((field) => (
+            {selectedTable?.fields
+              ?.filter((field) => {
+                const fieldName = field.name.toLowerCase()
+                return fieldName !== 'id' && 
+                       fieldName !== 'created_at' && 
+                       fieldName !== 'created at' &&
+                       fieldName !== 'createdat'
+              })
+              .map((field) => (
               <div key={field.id} className="space-y-2">
                 <Label htmlFor={`field-${field.id}`}>
                   {field.name}

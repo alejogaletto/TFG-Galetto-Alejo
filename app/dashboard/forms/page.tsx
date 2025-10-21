@@ -112,7 +112,8 @@ export default function FormsPage() {
     name: "",
     description: "",
     template: "blank",
-    database: "customers",
+    database: "",
+    databaseId: null as number | null,
     enableNotifications: true,
     enableWorkflow: false,
     enableCaptcha: true,
@@ -173,12 +174,33 @@ export default function FormsPage() {
       // Add the new form to the local state
       setForms((prevForms: FormType[]) => [...prevForms, createdForm[0]]);
 
+      const formId = createdForm[0].id;
+
+      // Create DataConnection if database was selected
+      if (newForm.databaseId) {
+        try {
+          await fetch('/api/data-connections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              form_id: formId,
+              virtual_schema_id: newForm.databaseId,
+              virtual_table_schema_id: null, // Will be set in form builder
+            }),
+          });
+        } catch (error) {
+          console.error("Error creating data connection:", error);
+          // Don't fail the form creation if data connection fails
+        }
+      }
+
       // Reset form state
       setNewForm({
         name: "",
         description: "",
         template: "blank",
-        database: "customers",
+        database: "",
+        databaseId: null,
         enableNotifications: true,
         enableWorkflow: false,
         enableCaptcha: true,
@@ -195,7 +217,7 @@ export default function FormsPage() {
       console.log("Formulario creado exitosamente:", createdForm[0].name);
 
       // Redirect to form builder
-      router.push(`/dashboard/form-builder/${createdForm[0].id}`);
+      router.push(`/dashboard/form-builder/${formId}`);
     } catch (error: any) {
       console.error("Error creating form:", error);
       setError(error?.message || "Error al crear el formulario");
@@ -491,12 +513,15 @@ export default function FormsPage() {
                           <Label>Conexión a Base de Datos</Label>
                           <Switch
                             id="db-connection"
-                            checked={!!newForm.database}
+                            checked={!!newForm.databaseId}
                             onCheckedChange={(checked) => {
                               setNewForm({
                                 ...newForm,
+                                databaseId: checked
+                                  ? (newForm.databaseId || (availableDatabases[0]?.id || null))
+                                  : null,
                                 database: checked
-                                  ? (newForm.database || (availableDatabases[0]?.name || "customers"))
+                                  ? (newForm.database || (availableDatabases[0]?.name || ""))
                                   : "",
                               })
                             }}
@@ -506,27 +531,45 @@ export default function FormsPage() {
                           Almacena los envíos del formulario en tu base de datos
                         </p>
 
-                        <div className="mt-4">
-                          <Label htmlFor="database-select">Seleccionar Base de Datos</Label>
-                          <Select
-                            defaultValue={newForm.database}
-                            value={newForm.database}
-                            onValueChange={(value: string) => setNewForm({ ...newForm, database: value })}
-                            disabled={!newForm.database}
-                          >
-                            <SelectTrigger id="database-select">
-                              <SelectValue placeholder="Seleccionar base de datos" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableDatabases.map((db) => (
-                                <SelectItem key={db.id} value={db.name}>
-                                  {db.name}
+                        {newForm.databaseId !== null && (
+                          <div className="mt-4">
+                            <Label htmlFor="database-select">Seleccionar Base de Datos</Label>
+                            <Select
+                              value={newForm.databaseId?.toString() || ""}
+                              onValueChange={(value: string) => {
+                                if (value === "new") {
+                                  // Open new database creation page in new tab
+                                  window.open("/dashboard/databases/new", "_blank");
+                                } else {
+                                  const selectedDb = availableDatabases.find(db => db.id.toString() === value);
+                                  setNewForm({ 
+                                    ...newForm, 
+                                    databaseId: Number(value),
+                                    database: selectedDb?.name || ""
+                                  });
+                                }
+                              }}
+                            >
+                              <SelectTrigger id="database-select">
+                                <SelectValue placeholder="Seleccionar base de datos" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableDatabases.map((db) => (
+                                  <SelectItem key={db.id} value={db.id.toString()}>
+                                    {db.name}
+                                  </SelectItem>
+                                ))}
+                                <Separator className="my-2" />
+                                <SelectItem value="new">
+                                  <div className="flex items-center">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Crear Nueva Base de Datos
+                                  </div>
                                 </SelectItem>
-                              ))}
-                              <SelectItem value="new">Crear Nueva Base de Datos</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
 
                       <Separator className="my-2" />

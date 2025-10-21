@@ -6,7 +6,7 @@ const supabase = createClient();
 // Create a solution instance from a template
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: template_id } = params;

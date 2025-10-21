@@ -98,17 +98,31 @@ export async function GET(req: NextRequest) {
 // Store data in BusinessData with field mapping
 async function storeInBusinessData(form_id: number, form_data: any, virtual_table_schema_id: number) {
   try {
+    console.log('📊 Storing in BusinessData:', { form_id, virtual_table_schema_id, form_data });
+
     // Get the data connection ID for this form
     const { data: dataConnection, error: connError } = await supabase
       .from('DataConnection')
-      .select('id')
+      .select('id, virtual_schema_id, virtual_table_schema_id')
       .eq('form_id', form_id)
       .single();
 
     if (connError || !dataConnection) {
-      console.error('Error fetching data connection:', connError);
+      console.error('❌ Error fetching data connection:', connError);
       return await storeInFormSubmission(form_id, form_data);
     }
+
+    console.log('✅ Found data connection:', dataConnection);
+
+    // Use the table ID from the data connection if available
+    const actualTableId = dataConnection.virtual_table_schema_id || virtual_table_schema_id;
+    
+    if (!actualTableId) {
+      console.error('❌ No virtual_table_schema_id found in DataConnection or parameters');
+      return await storeInFormSubmission(form_id, form_data);
+    }
+    
+    console.log('📍 Using table ID:', actualTableId);
 
     // Get field mappings for this data connection
     const { data: fieldMappings, error: mappingError } = await supabase
@@ -117,54 +131,79 @@ async function storeInBusinessData(form_id: number, form_data: any, virtual_tabl
       .eq('data_connection_id', dataConnection.id);
 
     if (mappingError) {
-      console.error('Error fetching field mappings:', mappingError);
-      // Fallback to generic storage
+      console.error('❌ Error fetching field mappings:', mappingError);
       return await storeInFormSubmission(form_id, form_data);
     }
 
-    // Map form data to database fields
+    console.log('📋 Field mappings:', fieldMappings);
+
+    // Get virtual field details to map to field names
+    const virtualFieldIds = fieldMappings?.map(m => m.virtual_field_schema_id) || [];
+    const { data: virtualFields, error: fieldsError } = await supabase
+      .from('VirtualFieldSchema')
+      .select('id, name, type')
+      .in('id', virtualFieldIds.length > 0 ? virtualFieldIds : [-1]);
+
+    if (fieldsError) {
+      console.error('❌ Error fetching virtual fields:', fieldsError);
+    }
+
+    console.log('🏷️ Virtual fields:', virtualFields);
+
+    // Map form data to database field names
     const mappedData: any = {};
     
-    if (fieldMappings && fieldMappings.length > 0) {
-      // Use field mappings to structure data
+    if (fieldMappings && fieldMappings.length > 0 && virtualFields) {
+      // Use field mappings to structure data with proper field names
       for (const mapping of fieldMappings) {
         const formFieldId = mapping.form_field_id;
         const virtualFieldId = mapping.virtual_field_schema_id;
+        const virtualField = virtualFields.find(vf => vf.id === virtualFieldId);
         
         // Find the corresponding value in form_data
-        if (form_data[formFieldId] !== undefined) {
-          mappedData[`field_${virtualFieldId}`] = form_data[formFieldId];
+        if (form_data[formFieldId] !== undefined && virtualField) {
+          // Use the actual field name from the virtual schema
+          mappedData[virtualField.name] = form_data[formFieldId];
+          console.log(`✅ Mapped field: ${virtualField.name} = ${form_data[formFieldId]}`);
         }
       }
-      
-      // Also store the original form data for reference
-      mappedData.original_form_data = form_data;
     } else {
-      // No mappings, store as-is
+      console.warn('⚠️ No field mappings found, storing raw data');
       mappedData.raw_data = form_data;
     }
+
+    console.log('💾 Final mapped data to store:', mappedData);
 
     // Store in BusinessData
     const { data, error } = await supabase
       .from('BusinessData')
       .insert([{
         user_id: 1, // TODO: Get from session
-        virtual_table_schema_id,
+        virtual_table_schema_id: actualTableId,
         data_json: mappedData
       }])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error inserting into BusinessData:', error);
+      throw error;
+    }
+
+    console.log('✅ Successfully stored in BusinessData:', data[0]);
+
+    // Also store in FormSubmission for backup
+    await storeInFormSubmission(form_id, form_data);
 
     return NextResponse.json({ 
       success: true, 
       message: 'Data stored in database',
       data_id: data[0].id,
-      storage_type: 'business_data'
+      storage_type: 'business_data',
+      mapped_fields: Object.keys(mappedData).length
     }, { status: 201 });
 
   } catch (error: any) {
-    console.error('Error storing in BusinessData:', error);
+    console.error('❌ Error storing in BusinessData:', error);
     // Fallback to generic storage
     return await storeInFormSubmission(form_id, form_data);
   }

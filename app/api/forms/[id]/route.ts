@@ -6,8 +6,8 @@ import { Form } from '@/lib/types';
 const supabase = createClient();
 
 // Get a single form by ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('Form').select('*').eq('id', id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Form not found' }, { status: 404 });
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Update a form by ID
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { name, description, configs, is_active } = await req.json() as Form;
   const { data, error } = await supabase.from('Form').update({ name, description, configs, is_active }).eq('id', id).select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -24,8 +24,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Delete a form by ID
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   // Delete dependent rows first to satisfy FK constraints
   const deleteFields = await supabase.from('FormField').delete().eq('form_id', id)
   if (deleteFields.error) return NextResponse.json({ error: deleteFields.error.message }, { status: 500 })
@@ -39,19 +39,19 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 }
 
 // Expanded: get a form with its fields
-export async function HEAD(req: NextRequest, { params }: { params: { id: string } }) {
+export async function HEAD(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // no-op for robots; keep default behavior
   return new NextResponse(null, { status: 200 })
 }
 
 // GET /api/forms/[id]?includeFields=true
-export async function OPTIONS(req: NextRequest, ctx: { params: { id: string } }) {
+export async function OPTIONS(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { searchParams } = new URL(req.url)
   if (searchParams.get('includeFields') !== 'true') {
     return new NextResponse(null, { status: 204 })
   }
 
-  const { id } = ctx.params
+  const { id } = await ctx.params
   const formRes = await supabase.from('Form').select('*').eq('id', id).single()
   if (formRes.error || !formRes.data) {
     return NextResponse.json({ error: formRes.error?.message || 'Form not found' }, { status: 404 })

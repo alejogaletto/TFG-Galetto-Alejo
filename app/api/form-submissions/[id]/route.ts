@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase-client';
 const supabase = createClient();
 
 // Get a single form submission by ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   
   try {
     const { data, error } = await supabase
@@ -30,8 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Update a form submission (for admin purposes)
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   
   try {
     const { submission_data } = await req.json();
@@ -54,8 +54,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Delete a form submission
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   
   try {
     const { error } = await supabase

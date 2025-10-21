@@ -6,8 +6,8 @@ import { BusinessData } from '@/lib/types';
 const supabase = createClient();
 
 // Get a single business data by ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('BusinessData').select('*').eq('id', id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Business data not found' }, { status: 404 });
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Update a business data by ID
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data_json } = await req.json() as BusinessData;
   const { data, error } = await supabase.from('BusinessData').update({ data_json, modification_date: new Date() }).eq('id', id).select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -24,8 +24,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Delete a business data by ID
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('BusinessData').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });

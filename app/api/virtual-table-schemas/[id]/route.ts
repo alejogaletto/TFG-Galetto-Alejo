@@ -6,8 +6,8 @@ import { VirtualTableSchema } from '@/lib/types';
 const supabase = createClient();
 
 // Get a single virtual table schema by ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('VirtualTableSchema').select('*').eq('id', id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Virtual table schema not found' }, { status: 404 });
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Update a virtual table schema by ID
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { name, description, configs } = await req.json() as VirtualTableSchema;
   const { data, error } = await supabase.from('VirtualTableSchema').update({ name, description, configs }).eq('id', id).select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -24,8 +24,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Delete a virtual table schema by ID
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('VirtualTableSchema').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });

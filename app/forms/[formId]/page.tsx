@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function FormView({ params }: { params: { formId: string } }) {
-  const { formId } = params
+export default function FormView({ params }: { params: Promise<{ formId: string }> }) {
+  const [formId, setFormId] = useState<string | null>(null)
   const [form, setForm] = useState<any | null>(null)
   const [fields, setFields] = useState<any[]>([])
   const [formData, setFormData] = useState<Record<string, any>>({})
@@ -24,7 +25,14 @@ export default function FormView({ params }: { params: { formId: string } }) {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [showConnections, setShowConnections] = useState(false)
 
+  // Unwrap params Promise
   useEffect(() => {
+    params.then((p) => setFormId(p.formId))
+  }, [params])
+
+  useEffect(() => {
+    if (!formId) return
+    
     const load = async () => {
       setIsLoading(true)
       try {
@@ -46,7 +54,8 @@ export default function FormView({ params }: { params: { formId: string } }) {
 
           const initial: Record<string, any> = {}
           ;(ff || []).forEach((fld: any) => {
-            initial[`field_${fld.id}`] = fld.type === "checkbox" ? false : fld.configs?.default ?? ""
+            // Boolean fields (checkbox, switch) should initialize to false
+            initial[`field_${fld.id}`] = (fld.type === "checkbox" || fld.type === "switch") ? false : fld.configs?.default ?? ""
           })
           setFormData(initial)
         } else {
@@ -76,7 +85,8 @@ export default function FormView({ params }: { params: { formId: string } }) {
       const cfg = fld.configs || {}
 
       if (cfg.required) {
-        if (fld.type === "checkbox") {
+        // Boolean fields (checkbox, switch) need special validation
+        if (fld.type === "checkbox" || fld.type === "switch") {
           if (!value) {
             newErrors[`field_${fld.id}`] = "Este campo es obligatorio"
             isValid = false
@@ -292,6 +302,93 @@ export default function FormView({ params }: { params: { formId: string } }) {
           </div>
         )
 
+      case "date":
+        return (
+          <div className="space-y-2" key={id}>
+            <Label htmlFor={`field_${id}`} className="flex">
+              {label}
+              {cfg.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Input
+              id={`field_${id}`}
+              type="date"
+              placeholder={cfg.placeholder}
+              value={value}
+              onChange={(e) => handleInputChange(id, e.target.value)}
+              className={error ? "border-red-500" : ""}
+            />
+            {cfg.helpText && <p className="text-sm text-muted-foreground">{cfg.helpText}</p>}
+            {error && <p className="text-sm text-red-500">{error}</p>}
+          </div>
+        )
+
+      case "switch":
+        return (
+          <div className="space-y-2" key={id}>
+            <div className="flex items-center justify-between p-3 border rounded-md bg-muted/20">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id={`field_${id}`}
+                  checked={!!value}
+                  onCheckedChange={(checked) => handleInputChange(id, checked)}
+                  className={error ? "border-red-500" : ""}
+                />
+                <div className="flex flex-col">
+                  <Label htmlFor={`field_${id}`} className="flex">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    {cfg.placeholder || "No / Si"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {cfg.helpText && <p className="text-sm text-muted-foreground mt-2">{cfg.helpText}</p>}
+            {error && <p className="text-sm text-red-500">{error}</p>}
+          </div>
+        )
+
+      case "number":
+        return (
+          <div className="space-y-2" key={id}>
+            <Label htmlFor={`field_${id}`} className="flex">
+              {label}
+              {cfg.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Input
+              id={`field_${id}`}
+              type="number"
+              placeholder={cfg.placeholder}
+              value={value}
+              onChange={(e) => handleInputChange(id, e.target.value)}
+              className={error ? "border-red-500" : ""}
+            />
+            {cfg.helpText && <p className="text-sm text-muted-foreground">{cfg.helpText}</p>}
+            {error && <p className="text-sm text-red-500">{error}</p>}
+          </div>
+        )
+
+      case "name":
+        return (
+          <div className="space-y-2" key={id}>
+            <Label htmlFor={`field_${id}`} className="flex">
+              {label}
+              {cfg.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Input
+              id={`field_${id}`}
+              type="text"
+              placeholder={cfg.placeholder}
+              value={value}
+              onChange={(e) => handleInputChange(id, e.target.value)}
+              className={error ? "border-red-500" : ""}
+            />
+            {cfg.helpText && <p className="text-sm text-muted-foreground">{cfg.helpText}</p>}
+            {error && <p className="text-sm text-red-500">{error}</p>}
+          </div>
+        )
+
       default:
         return null
     }
@@ -347,7 +444,8 @@ export default function FormView({ params }: { params: { formId: string } }) {
                   setShowConnections(false)
                   const initial: Record<string, any> = {}
                   fields.forEach((fld) => {
-                    initial[`field_${fld.id}`] = fld.type === "checkbox" ? false : fld.configs?.default ?? ""
+                    // Boolean fields (checkbox, switch) should initialize to false
+                    initial[`field_${fld.id}`] = (fld.type === "checkbox" || fld.type === "switch") ? false : fld.configs?.default ?? ""
                   })
                   setFormData(initial)
                   setErrors({})

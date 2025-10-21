@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { toast } from "sonner"
 import {
   ArrowLeft,
   Calendar,
@@ -64,100 +65,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-// Mock database data - in a real app, this would come from an API call
-const databaseTemplates: Record<string, any> = {
-  customers: {
-    id: "customers",
-    name: "Customers",
-    description: "Customer information database",
-    tables: [
-      {
-        id: 1,
-        name: "Customers",
-        description: "Store customer information",
-        fields: [
-          { id: 1, name: "id", type: "id", required: true, unique: true, isPrimary: true },
-          { id: 2, name: "name", type: "text", required: true, unique: false },
-          { id: 3, name: "email", type: "email", required: true, unique: true },
-          { id: 4, name: "phone", type: "text", required: false, unique: false },
-          { id: 5, name: "created_at", type: "datetime", required: true, unique: false },
-        ],
-      },
-    ],
-  },
-  products: {
-    id: "products",
-    name: "Products",
-    description: "Product catalog database",
-    tables: [
-      {
-        id: 1,
-        name: "Products",
-        description: "Store product information",
-        fields: [
-          { id: 1, name: "id", type: "id", required: true, unique: true, isPrimary: true },
-          { id: 2, name: "name", type: "text", required: true, unique: true },
-          { id: 3, name: "description", type: "text", required: false, unique: false },
-          { id: 4, name: "price", type: "number", required: true, unique: false },
-          { id: 5, name: "category", type: "text", required: true, unique: false },
-          { id: 6, name: "in_stock", type: "boolean", required: true, unique: false },
-        ],
-      },
-    ],
-  },
-  orders: {
-    id: "orders",
-    name: "Orders",
-    description: "Customer orders database",
-    tables: [
-      {
-        id: 1,
-        name: "Orders",
-        description: "Store order information",
-        fields: [
-          { id: 1, name: "id", type: "id", required: true, unique: true, isPrimary: true },
-          { id: 2, name: "customer_id", type: "number", required: true, unique: false },
-          { id: 3, name: "order_date", type: "datetime", required: true, unique: false },
-          { id: 4, name: "status", type: "text", required: true, unique: false },
-          { id: 5, name: "total", type: "number", required: true, unique: false },
-        ],
-      },
-      {
-        id: 2,
-        name: "OrderItems",
-        description: "Store order line items",
-        fields: [
-          { id: 1, name: "id", type: "id", required: true, unique: true, isPrimary: true },
-          { id: 2, name: "order_id", type: "number", required: true, unique: false },
-          { id: 3, name: "product_id", type: "number", required: true, unique: false },
-          { id: 4, name: "quantity", type: "number", required: true, unique: false },
-          { id: 5, name: "price", type: "number", required: true, unique: false },
-        ],
-      },
-    ],
-  },
-  employees: {
-    id: "employees",
-    name: "Employees",
-    description: "Employee information database",
-    tables: [
-      {
-        id: 1,
-        name: "Employees",
-        description: "Store employee information",
-        fields: [
-          { id: 1, name: "id", type: "id", required: true, unique: true, isPrimary: true },
-          { id: 2, name: "first_name", type: "text", required: true, unique: false },
-          { id: 3, name: "last_name", type: "text", required: true, unique: false },
-          { id: 4, name: "email", type: "email", required: true, unique: true },
-          { id: 5, name: "position", type: "text", required: true, unique: false },
-          { id: 6, name: "department", type: "text", required: true, unique: false },
-          { id: 7, name: "hire_date", type: "datetime", required: true, unique: false },
-        ],
-      },
-    ],
-  },
-}
+// Virtual schemas will be fetched from the API
 
 export default function FormBuilderPage() {
   const params = useParams()
@@ -174,12 +82,21 @@ export default function FormBuilderPage() {
   const [showWelcome, setShowWelcome] = useState(true)
   const dropAreaRef = useRef(null)
 
+  // Sidebar resize state
+  const [sidebarWidth, setSidebarWidth] = useState(250)
+  const [isResizing, setIsResizing] = useState(false)
+  const sidebarRef = useRef<HTMLDivElement>(null)
+
   // Database connection state
-  const [connectedDatabase, setConnectedDatabase] = useState<string | null>(null)
-  const [selectedTable, setSelectedTable] = useState<string | null>(null)
+  const [dataConnectionId, setDataConnectionId] = useState<number | null>(null)
+  const [connectedSchemaId, setConnectedSchemaId] = useState<number | null>(null)
+  const [connectedSchema, setConnectedSchema] = useState<any>(null)
+  const [selectedTableId, setSelectedTableId] = useState<number | null>(null)
   const [showDatabaseConnect, setShowDatabaseConnect] = useState(false)
   const [autoMapFields, setAutoMapFields] = useState(true)
-  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({})
+  const [fieldMappings, setFieldMappings] = useState<Record<number, number>>({}) // form_field_id -> virtual_field_schema_id
+  const [availableSchemas, setAvailableSchemas] = useState<any[]>([])
+  const [loadingSchemas, setLoadingSchemas] = useState(false)
 
   // Integration options
   const [integrations, setIntegrations] = useState({
@@ -335,20 +252,49 @@ export default function FormBuilderPage() {
           return
         }
 
-        // Fetch the actual form data from the API
-        const response = await fetch(`/api/forms/${formId}`)
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+        // Fetch the form data and fields separately
+        const [formResponse, fieldsResponse] = await Promise.all([
+          fetch(`/api/forms/${formId}`),
+          fetch(`/api/form-fields?form_id=${formId}`)
+        ])
+        
+        if (!formResponse.ok) {
+          throw new Error(`HTTP error! status: ${formResponse.status}`)
         }
         
-        const formData = await response.json()
+        const formData = await formResponse.json()
         
         // Set form title and description
         setFormTitle(formData.name || "Nuevo Formulario")
         setFormDescription(formData.description || "Recopila información de tus clientes")
         
-        // Check if the form has a template configuration
-        if (formData.configs && formData.configs.template) {
+        // Fetch fields from the API
+        let loadedFields: any[] = []
+        if (fieldsResponse.ok) {
+          const fieldsData = await fieldsResponse.json()
+          if (fieldsData && fieldsData.length > 0) {
+            // Convert FormField objects to form elements
+            loadedFields = fieldsData
+              .sort((a: any, b: any) => (a.position || 0) - (b.position || 0)) // Sort by position
+              .map((field: any, index: number) => ({
+                id: field.id || index + 1,
+                type: field.type || "text",
+                label: field.label || `Campo ${index + 1}`,
+                placeholder: field.configs?.placeholder || "",
+                required: field.configs?.required || false,
+                helpText: field.configs?.helpText || "",
+                options: field.configs?.options || [],
+                rows: field.configs?.rows || 3,
+                dbField: field.configs?.dbField || null,
+              }))
+            
+            setFormElements(loadedFields)
+            console.log("📝 Loaded form fields from database:", loadedFields.map(f => ({ id: f.id, label: f.label })))
+          }
+        }
+        
+        // If no fields loaded, check if form has a template configuration
+        if (loadedFields.length === 0 && formData.configs && formData.configs.template) {
           const templateId = formData.configs.template as keyof typeof templates
           
           // Apply the template if it exists
@@ -359,61 +305,104 @@ export default function FormBuilderPage() {
             console.warn(`Template ${templateId} not found, starting with blank form`)
             setFormElements([])
           }
-          
-          // Set database connection if configured
-          if (formData.configs.database) {
-            const dbKey = formData.configs.database as keyof typeof databaseTemplates
-            setConnectedDatabase(dbKey)
-            // Try to find a suitable table for the database
-            const db = databaseTemplates[dbKey]
-            if (db && db.tables.length > 0) {
-              setSelectedTable(db.tables[0].name)
-            }
-          }
-          
-          // Set other configurations
-          if (formData.configs.enableNotifications !== undefined) {
-            // Handle notifications if needed
-          }
-          
-          if (formData.configs.enableWorkflow !== undefined) {
-            // Handle workflow if needed
-          }
-          
-          if (formData.configs.enableCaptcha !== undefined) {
-            // Handle captcha if needed
-          }
-          
-          if (formData.configs.googleSheets !== undefined) {
-            setIntegrations(prev => ({ ...prev, googleSheets: !!formData.configs.googleSheets }))
-          }
-          
-          if (formData.configs.googleDocs !== undefined) {
-            setIntegrations(prev => ({ ...prev, googleDocs: !!formData.configs.googleDocs }))
-          }
-        } else {
-          // No template specified, start with blank form
-          console.log("No template specified, starting with blank form")
-          setFormElements([])
         }
         
-        // If we have form fields from the database, load them instead of template
-        if (formData.fields && formData.fields.length > 0) {
-          // Convert FormField objects to form elements
-          const loadedElements = formData.fields.map((field: any, index: number) => ({
-            id: field.id || index + 1,
-            type: field.type || "text",
-            label: field.label || `Campo ${index + 1}`,
-            placeholder: field.configs?.placeholder || "",
-            required: field.configs?.required || false,
-            helpText: field.configs?.helpText || "",
-            options: field.configs?.options || [],
-            rows: field.configs?.rows || 3,
-            dbField: field.configs?.dbField || null,
-          }))
+        // Set other configurations
+        if (formData.configs?.googleSheets !== undefined) {
+          setIntegrations(prev => ({ ...prev, googleSheets: !!formData.configs.googleSheets }))
+        }
+        
+        if (formData.configs?.googleDocs !== undefined) {
+          setIntegrations(prev => ({ ...prev, googleDocs: !!formData.configs.googleDocs }))
+        }
+
+        // Fetch DataConnection if exists
+        console.log('🔌 Fetching DataConnection for form_id:', formId)
+        const dataConnResponse = await fetch(`/api/data-connections?form_id=${formId}`)
+        console.log('📡 DataConnection response status:', dataConnResponse.status)
+        
+        if (dataConnResponse.ok) {
+          const dataConn = await dataConnResponse.json()
+          console.log('🔗 DataConnection found:', dataConn)
           
-          setFormElements(loadedElements)
-          console.log("Loaded form fields from database:", loadedElements)
+          if (dataConn && dataConn.id) {
+            console.log('✅ Setting DataConnection state:', {
+              dataConnectionId: dataConn.id,
+              virtual_schema_id: dataConn.virtual_schema_id,
+              virtual_table_schema_id: dataConn.virtual_table_schema_id
+            })
+            
+            setDataConnectionId(dataConn.id)
+            setConnectedSchemaId(dataConn.virtual_schema_id)
+            setSelectedTableId(dataConn.virtual_table_schema_id)
+
+            // Fetch the virtual schema with full tree
+            if (dataConn.virtual_schema_id) {
+              const schemaResponse = await fetch(`/api/virtual-schemas/${dataConn.virtual_schema_id}/tree`)
+              if (schemaResponse.ok) {
+                const schema = await schemaResponse.json()
+                console.log('📊 Virtual schema loaded:', schema.name)
+                setConnectedSchema(schema)
+              }
+            }
+
+            // Fetch field mappings
+            console.log('🔍 Fetching field mappings for data_connection_id:', dataConn.id)
+            const mappingsResponse = await fetch(`/api/field-mappings?data_connection_id=${dataConn.id}`)
+            console.log('📡 Mappings response status:', mappingsResponse.status)
+            
+            if (mappingsResponse.ok) {
+              const mappings = await mappingsResponse.json()
+              console.log('🔍 Raw field mappings from API:', mappings)
+              const mappingsMap: Record<number, number> = {}
+              mappings.forEach((m: any) => {
+                console.log('  Mapping:', m.form_field_id, '->', m.virtual_field_schema_id)
+                mappingsMap[m.form_field_id] = m.virtual_field_schema_id
+              })
+              console.log('🗺️ Mapped field mappings:', mappingsMap)
+              console.log('📋 Loaded form field IDs:', loadedFields.map(el => el.id))
+              setFieldMappings(mappingsMap)
+            } else {
+              console.error('❌ Failed to fetch field mappings:', await mappingsResponse.text())
+            }
+          } else {
+            console.log('⚠️ DataConnection exists but has no ID')
+          }
+        } else {
+          console.log('⚠️ No DataConnection found for this form')
+        }
+
+        // Migration: Check if form has old-style database config but no DataConnection
+        if (formData.configs?.database && !dataConnectionId) {
+          console.log("Migrating old database connection:", formData.configs.database)
+          // Fetch all virtual schemas to find matching one
+          const schemasResponse = await fetch('/api/virtual-schemas')
+          if (schemasResponse.ok) {
+            const schemas = await schemasResponse.json()
+            const matchingSchema = schemas.find((s: any) => 
+              s.name.toLowerCase() === formData.configs.database.toLowerCase()
+            )
+            
+            if (matchingSchema) {
+              // Create DataConnection for this form
+              const createResponse = await fetch('/api/data-connections', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  form_id: Number(formId),
+                  virtual_schema_id: matchingSchema.id,
+                  virtual_table_schema_id: null,
+                }),
+              })
+              
+              if (createResponse.ok) {
+                const newDataConn = await createResponse.json()
+                setDataConnectionId(newDataConn.id)
+                setConnectedSchemaId(newDataConn.virtual_schema_id)
+                console.log("Migration successful: Created DataConnection", newDataConn.id)
+              }
+            }
+          }
         }
         
       } catch (error) {
@@ -431,6 +420,26 @@ export default function FormBuilderPage() {
   // Add a loading state to handle initial rendering
   const [isLoading, setIsLoading] = useState(true)
 
+  // Fetch available databases on component mount (same as wizard)
+  useEffect(() => {
+    const fetchDatabases = async () => {
+      try {
+        const res = await fetch('/api/virtual-schemas')
+        if (!res.ok) {
+          console.error('Failed to fetch schemas:', res.status)
+          return
+        }
+        const data = await res.json()
+        const list = Array.isArray(data) ? data : []
+        console.log('Fetched available databases:', list)
+        setAvailableSchemas(list)
+      } catch (e) {
+        console.error('Error fetching databases:', e)
+      }
+    }
+    fetchDatabases()
+  }, [])
+
   // Add this useEffect to handle loading state
   useEffect(() => {
     // Set loading to false after a short delay
@@ -441,6 +450,35 @@ export default function FormBuilderPage() {
     return () => clearTimeout(timer)
   }, [])
 
+  // Sidebar resize handlers
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+      const newWidth = e.clientX
+      if (newWidth >= 200 && newWidth <= 500) {
+        setSidebarWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
+
   const fieldTypes = [
     { type: "text", label: "Texto", icon: <Type className="h-4 w-4" /> },
     { type: "email", label: "Email", icon: <Mail className="h-4 w-4" /> },
@@ -448,6 +486,7 @@ export default function FormBuilderPage() {
     { type: "phone", label: "Teléfono", icon: <Phone className="h-4 w-4" /> },
     { type: "textarea", label: "Área de Texto", icon: <List className="h-4 w-4" /> },
     { type: "checkbox", label: "Casilla", icon: <Check className="h-4 w-4" /> },
+    { type: "switch", label: "Switch (Si/No)", icon: <Check className="h-4 w-4" /> },
     { type: "select", label: "Lista", icon: <ChevronDown className="h-4 w-4" /> },
     { type: "radio", label: "Opción", icon: <Circle className="h-4 w-4" /> },
     { type: "date", label: "Fecha", icon: <Calendar className="h-4 w-4" /> },
@@ -455,57 +494,122 @@ export default function FormBuilderPage() {
   ]
 
   // Function to connect to a database
-  const handleConnectToDatabase = () => {
-    if (!connectedDatabase || !selectedTable) return
+  const handleConnectToDatabase = async () => {
+    if (!connectedSchemaId || !selectedTableId) return
 
-    // Create field mappings based on field types if autoMapFields is enabled
-    if (autoMapFields) {
-      const db = databaseTemplates[connectedDatabase]
-      const tableData = db.tables.find((t: any) => t.name === selectedTable)
+    try {
+      // Create or update DataConnection
+      const dataConnResponse = await fetch('/api/data-connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form_id: Number(formId),
+          virtual_schema_id: connectedSchemaId,
+          virtual_table_schema_id: selectedTableId,
+        }),
+      })
 
-      if (tableData && tableData.fields) {
-        const newMappings: Record<string, string> = {}
+      if (!dataConnResponse.ok) {
+        console.error('Failed to create/update data connection')
+        return
+      }
 
-        // Try to automatically map form fields to database fields
-        formElements.forEach((element) => {
-          // Find a matching database field based on type and name similarity
-          const matchingField = tableData.fields.find((field: any) => {
-            // Skip ID fields
-            if (field.type === "id") return false
+      const dataConn = await dataConnResponse.json()
+      setDataConnectionId(dataConn.id)
 
-            // Match types
-            const typeMatches =
-              (element.type === "text" && field.type === "text") ||
-              (element.type === "email" && field.type === "email") ||
-              (element.type === "number" && field.type === "number") ||
-              (element.type === "phone" && field.type === "text") ||
-              (element.type === "checkbox" && field.type === "boolean") ||
-              (element.type === "date" && field.type === "datetime")
+      // Determine which mappings to save
+      let mappingsToSave: Record<number, number> = {}
 
-            // Check if field names are similar
-            const elementName = element.label.toLowerCase()
-            const fieldName = field.name.toLowerCase()
+      // Create field mappings based on field types if autoMapFields is enabled
+      if (autoMapFields && connectedSchema) {
+        const selectedTable = connectedSchema.tables?.find((t: any) => t.id === selectedTableId)
 
-            return (
-              typeMatches &&
-              (fieldName.includes(elementName) ||
-                elementName.includes(fieldName) ||
-                (elementName.includes("name") && fieldName.includes("name")) ||
-                (elementName.includes("email") && fieldName.includes("email")) ||
-                (elementName.includes("phone") && fieldName.includes("phone")))
-            )
+        if (selectedTable && selectedTable.fields) {
+          const newMappings: Record<number, number> = {}
+
+          // Try to automatically map form fields to database fields
+          formElements.forEach((element) => {
+            // Find a matching database field based on type and name similarity
+            const matchingField = selectedTable.fields.find((field: any) => {
+              // Skip ID fields
+              if (field.type === "id" || field.name === "id") return false
+
+              // Match types - be flexible with type matching
+              const typeMatches =
+                (element.type === "text" && (field.type === "text" || field.type === "varchar")) ||
+                (element.type === "email" && (field.type === "email" || field.type === "text" || field.type === "varchar")) ||
+                (element.type === "number" && (field.type === "number" || field.type === "integer" || field.type === "int")) ||
+                (element.type === "phone" && (field.type === "text" || field.type === "varchar")) ||
+                // Boolean fields can be checkbox, switch, or radio with 2 options
+                (element.type === "checkbox" && field.type === "boolean") ||
+                (element.type === "switch" && field.type === "boolean") ||
+                (element.type === "radio" && field.type === "boolean" && element.options?.length === 2) ||
+                (element.type === "date" && (field.type === "datetime" || field.type === "date" || field.type === "timestamp"))
+
+              // Check if field names are similar
+              const elementName = element.label.toLowerCase().replace(/\s+/g, '_')
+              const fieldName = field.name.toLowerCase()
+
+              return (
+                typeMatches &&
+                (fieldName.includes(elementName) ||
+                  elementName.includes(fieldName) ||
+                  (elementName.includes("name") && fieldName.includes("name")) ||
+                  (elementName.includes("email") && fieldName.includes("email")) ||
+                  (elementName.includes("phone") && fieldName.includes("phone")))
+              )
+            })
+
+            if (matchingField) {
+              newMappings[element.id] = matchingField.id
+            }
           })
 
-          if (matchingField) {
-            newMappings[element.id] = matchingField.name
-          }
+          setFieldMappings(newMappings)
+          mappingsToSave = newMappings
+        }
+      } else {
+        // Use manual mappings from the UI
+        mappingsToSave = fieldMappings
+      }
+
+      // Persist field mappings to the API
+      if (Object.keys(mappingsToSave).length > 0) {
+        const mappingsArray = Object.entries(mappingsToSave).map(([formFieldId, virtualFieldId]) => ({
+          data_connection_id: dataConn.id,
+          form_field_id: Number(formFieldId),
+          virtual_field_schema_id: virtualFieldId,
+          changes: null,
+        }))
+
+        console.log('💾 Saving field mappings:', mappingsArray)
+        console.log('📊 Data Connection ID:', dataConn.id)
+        console.log('📋 Number of mappings:', mappingsArray.length)
+        
+        const mappingsResponse = await fetch('/api/field-mappings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mappingsArray),
         })
 
-        setFieldMappings(newMappings)
+        if (!mappingsResponse.ok) {
+          const errorData = await mappingsResponse.json().catch(() => ({}))
+          console.error('❌ Failed to save field mappings:', errorData)
+          alert('Error: No se pudieron guardar los mapeos de campos. Por favor intenta nuevamente.')
+          return
+        } else {
+          const result = await mappingsResponse.json()
+          console.log('✅ Field mappings saved successfully:', result)
+        }
+      } else {
+        console.warn('⚠️ No field mappings to save! Make sure to map at least one field.')
+        alert('Advertencia: No has mapeado ningún campo. Los datos del formulario no se guardarán en campos específicos de la base de datos.')
       }
-    }
 
-    setShowDatabaseConnect(false)
+      setShowDatabaseConnect(false)
+    } catch (error) {
+      console.error('Error connecting to database:', error)
+    }
   }
 
   const handleDragStart = (e: any, type: any) => {
@@ -557,6 +661,9 @@ export default function FormBuilderPage() {
       newElement.rows = 3
     } else if (type === "checkbox") {
       newElement.label = "Nueva Opción de Casilla"
+    } else if (type === "switch") {
+      newElement.label = "Nueva Opción Switch"
+      newElement.placeholder = "No / Si"
     }
 
     setFormElements([...formElements, newElement])
@@ -650,6 +757,22 @@ export default function FormBuilderPage() {
               <Checkbox id={`element-${element.id}`} />
             </div>
           )
+        case "switch":
+          return (
+            <div className="flex items-center justify-between p-3 border rounded-md bg-muted/20">
+              <div className="flex items-center gap-3">
+                <Switch id={`element-${element.id}`} />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">
+                    {element.placeholder || "No / Si"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Activa o desactiva esta opción
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
         case "radio":
           return (
             <RadioGroup defaultValue="option-1">
@@ -673,14 +796,18 @@ export default function FormBuilderPage() {
   }
 
   const renderDatabaseTag = (element: any) => {
-    if (!connectedDatabase || !selectedTable || !fieldMappings[element.id]) return null
+    if (!connectedSchemaId || !selectedTableId || !fieldMappings[element.id]) return null
 
-    const mappedField = fieldMappings[element.id]
+    const mappedFieldId = fieldMappings[element.id]
+    const selectedTable = connectedSchema?.tables?.find((t: any) => t.id === selectedTableId)
+    const mappedField = selectedTable?.fields?.find((f: any) => f.id === mappedFieldId)
+
+    if (!mappedField) return null
 
     return (
       <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 hover:bg-blue-50">
         <Database className="h-3 w-3 mr-1" />
-        {mappedField}
+        {mappedField.name}
       </Badge>
     )
   }
@@ -690,46 +817,49 @@ export default function FormBuilderPage() {
 
     return (
       <div className="space-y-4 p-4 border rounded-md bg-muted/30">
-        <div className="flex justify-between items-center">
-          <h3 className="font-medium">Configuración del Campo</h3>
+        <div className="flex justify-between items-center gap-2">
+          <h3 className="font-medium text-sm">Configuración del Campo</h3>
           <Button variant="ghost" size="sm" onClick={() => setShowFieldSettings(null)}>
             Cerrar
           </Button>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor={`field-label-${element.id}`}>Etiqueta</Label>
+          <Label htmlFor={`field-label-${element.id}`} className="text-xs">Etiqueta</Label>
           <Input
             id={`field-label-${element.id}`}
             value={element.label}
             onChange={(e) => updateFormElement(element.id, { label: e.target.value })}
+            className="text-sm"
           />
         </div>
 
         {["text", "email", "number", "phone", "textarea", "select", "name"].includes(element.type) && (
           <div className="space-y-2">
-            <Label htmlFor={`field-placeholder-${element.id}`}>Texto de Ejemplo</Label>
+            <Label htmlFor={`field-placeholder-${element.id}`} className="text-xs">Texto de Ejemplo</Label>
             <Input
               id={`field-placeholder-${element.id}`}
               value={element.placeholder}
               onChange={(e) => updateFormElement(element.id, { placeholder: e.target.value })}
+              className="text-sm"
             />
           </div>
         )}
 
         <div className="space-y-2">
-          <Label htmlFor={`field-help-${element.id}`}>Texto de Ayuda</Label>
+          <Label htmlFor={`field-help-${element.id}`} className="text-xs">Texto de Ayuda</Label>
           <Input
             id={`field-help-${element.id}`}
             value={element.helpText || ""}
             onChange={(e) => updateFormElement(element.id, { helpText: e.target.value })}
             placeholder="Información adicional sobre este campo"
+            className="text-sm"
           />
         </div>
 
         {element.type === "textarea" && (
           <div className="space-y-2">
-            <Label htmlFor={`field-rows-${element.id}`}>Filas</Label>
+            <Label htmlFor={`field-rows-${element.id}`} className="text-xs">Filas</Label>
             <Input
               id={`field-rows-${element.id}`}
               type="number"
@@ -737,13 +867,14 @@ export default function FormBuilderPage() {
               max="10"
               value={element.rows || 3}
               onChange={(e) => updateFormElement(element.id, { rows: Number.parseInt(e.target.value) })}
+              className="text-sm"
             />
           </div>
         )}
 
         {["select", "radio"].includes(element.type) && element.options && (
           <div className="space-y-2">
-            <Label>Opciones</Label>
+            <Label className="text-xs">Opciones</Label>
             <div className="space-y-2">
               {element.options.map((option: any, i: number) => (
                 <div key={i} className="flex items-center space-x-2">
@@ -754,6 +885,7 @@ export default function FormBuilderPage() {
                       newOptions[i] = e.target.value
                       updateFormElement(element.id, { options: newOptions })
                     }}
+                    className="text-sm"
                   />
                   <Button
                     variant="ghost"
@@ -774,6 +906,7 @@ export default function FormBuilderPage() {
                   const newOptions = [...(element.options || []), `Option ${(element.options?.length || 0) + 1}`]
                   updateFormElement(element.id, { options: newOptions })
                 }}
+                className="w-full"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Agregar Opción
@@ -788,12 +921,12 @@ export default function FormBuilderPage() {
             checked={element.required}
             onCheckedChange={(checked) => updateFormElement(element.id, { required: checked })}
           />
-          <Label htmlFor={`field-required-${element.id}`}>Campo obligatorio</Label>
+          <Label htmlFor={`field-required-${element.id}`} className="text-xs">Campo obligatorio</Label>
         </div>
 
-        {connectedDatabase && selectedTable && (
+        {connectedSchemaId && selectedTableId && connectedSchema && (
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
+            <Label className="flex items-center gap-2 text-xs">
               Mapeo de Base de Datos
               <TooltipProvider>
                 <Tooltip>
@@ -807,15 +940,31 @@ export default function FormBuilderPage() {
               </TooltipProvider>
             </Label>
             <Select
-              value={fieldMappings[element.id] || "not-mapped"}
-              onValueChange={(value) => {
+              value={fieldMappings[element.id]?.toString() || "not-mapped"}
+              onValueChange={async (value) => {
                 const newMappings = { ...fieldMappings }
                 if (value !== "not-mapped") {
-                  newMappings[element.id] = value
+                  newMappings[element.id] = Number(value)
                 } else {
                   delete newMappings[element.id]
                 }
                 setFieldMappings(newMappings)
+
+                // Persist mapping change to API
+                if (dataConnectionId) {
+                  const mappingsToSave = Object.entries(newMappings).map(([formFieldId, virtualFieldId]) => ({
+                    data_connection_id: dataConnectionId,
+                    form_field_id: Number(formFieldId),
+                    virtual_field_schema_id: virtualFieldId,
+                    changes: null,
+                  }))
+
+                  await fetch('/api/field-mappings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(mappingsToSave),
+                  })
+                }
               }}
             >
               <SelectTrigger>
@@ -823,11 +972,11 @@ export default function FormBuilderPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="not-mapped">Sin mapear</SelectItem>
-                {databaseTemplates[connectedDatabase]?.tables
-                  .find((t: any) => t.name === selectedTable)
-                  ?.fields.filter((f: any) => f.type !== "id") // Filter out ID fields
+                {connectedSchema?.tables
+                  ?.find((t: any) => t.id === selectedTableId)
+                  ?.fields?.filter((f: any) => f.type !== "id" && f.name !== "id") // Filter out ID fields
                   .map((field: any) => (
-                    <SelectItem key={field.id} value={field.name}>
+                    <SelectItem key={field.id} value={field.id.toString()}>
                       {field.name} ({field.type})
                     </SelectItem>
                   ))}
@@ -836,24 +985,23 @@ export default function FormBuilderPage() {
           </div>
         )}
 
-        <div className="pt-2 flex justify-between">
-          <Button variant="destructive" size="sm" onClick={() => removeFormElement(element.id)}>
+        <div className="pt-2 flex flex-col gap-2">
+          <Button variant="destructive" size="sm" onClick={() => removeFormElement(element.id)} className="w-full">
             <Trash className="h-4 w-4 mr-2" />
             Eliminar
           </Button>
-          <div className="space-x-2">
-            <Button variant="outline" size="sm" onClick={() => duplicateFormElement(element.id)}>
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicar
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => duplicateFormElement(element.id)} className="w-full">
+            <Copy className="h-4 w-4 mr-2" />
+            Duplicar
+          </Button>
         </div>
       </div>
     )
   }
 
   const renderDatabaseConnection = () => {
-    if (!connectedDatabase || !selectedTable) {
+    // No database connected at all
+    if (!connectedSchemaId) {
       return (
         <div className="p-4 border rounded-md bg-muted/30 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -881,6 +1029,49 @@ export default function FormBuilderPage() {
       )
     }
 
+    // Database connected but no table selected
+    if (!selectedTableId) {
+      return (
+        <div className="p-4 border rounded-md bg-blue-50/30 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-blue-600" />
+              <h3 className="font-medium text-blue-700">Conexión de Base de Datos</h3>
+            </div>
+            <Badge variant="outline" className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+              Conectado
+            </Badge>
+          </div>
+
+          <div className="mb-4">
+            <Label className="text-sm text-blue-700">Base de Datos Conectada</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Database className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{connectedSchema?.name || "Loading..."}</span>
+            </div>
+          </div>
+
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Selecciona una Tabla</AlertTitle>
+            <AlertDescription>
+              Tu formulario está conectado a una base de datos, pero necesitas seleccionar una tabla específica para almacenar los envíos.
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setShowDatabaseConnect(true)}>
+              <Settings className="h-4 w-4 mr-2" />
+              Seleccionar Tabla
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    // Both database and table connected
+    const selectedTable = connectedSchema?.tables?.find((t: any) => t.id === selectedTableId)
+
     return (
       <div className="p-4 border rounded-md bg-blue-50/30 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -898,7 +1089,7 @@ export default function FormBuilderPage() {
             <Label className="text-sm text-blue-700">Base de Datos Conectada</Label>
             <div className="flex items-center gap-2 mt-1">
               <Database className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{databaseTemplates[connectedDatabase]?.name}</span>
+              <span className="text-sm font-medium">{connectedSchema?.name || "Database"}</span>
             </div>
           </div>
 
@@ -906,7 +1097,7 @@ export default function FormBuilderPage() {
             <Label className="text-sm text-blue-700">Tabla Conectada</Label>
             <div className="flex items-center gap-2 mt-1">
               <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{selectedTable}</span>
+              <span className="text-sm font-medium">{selectedTable?.name || "Table"}</span>
             </div>
           </div>
         </div>
@@ -921,16 +1112,17 @@ export default function FormBuilderPage() {
               </Button>
             </div>
             <div className="bg-white/50 rounded-md p-2 text-sm">
-              {Object.entries(fieldMappings).map(([formFieldId, dbField]) => {
-                const formField = formElements.find((el) => el.id === Number.parseInt(formFieldId))
-                if (!formField) return null
+              {Object.entries(fieldMappings).map(([formFieldId, virtualFieldId]) => {
+                const formField = formElements.find((el) => el.id === Number(formFieldId))
+                const dbField = selectedTable?.fields?.find((f: any) => f.id === virtualFieldId)
+                if (!formField || !dbField) return null
                 return (
                   <div key={formFieldId} className="flex items-center justify-between py-1 border-b last:border-0">
                     <span>{formField.label}</span>
                     <div className="flex items-center">
                       <ArrowRight className="h-3 w-3 mx-2 text-muted-foreground" />
                       <Badge variant="outline" className="bg-blue-50">
-                        {dbField}
+                        {dbField.name}
                       </Badge>
                     </div>
                   </div>
@@ -941,7 +1133,7 @@ export default function FormBuilderPage() {
         )}
 
         <div className="mt-4 flex justify-end">
-          <Button variant="outline" size="sm" className="text-blue-700 border-blue-200 hover:bg-blue-50">
+          <Button variant="outline" size="sm" className="text-blue-700 border-blue-200 hover:bg-blue-50" onClick={() => setShowDatabaseConnect(true)}>
             <Settings className="h-4 w-4 mr-2" />
             Configurar Conexión
           </Button>
@@ -1036,10 +1228,10 @@ export default function FormBuilderPage() {
               <span className="font-medium">Volver a Formularios</span>
             </Link>
             <div className="flex items-center gap-2">
-              {connectedDatabase && selectedTable && (
+              {connectedSchemaId && selectedTableId && connectedSchema && (
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50">
                   <Database className="h-3 w-3 mr-1" />
-                  Conectado a {databaseTemplates[connectedDatabase]?.name}
+                  Conectado a {connectedSchema.name}
                 </Badge>
               )}
             </div>
@@ -1086,12 +1278,12 @@ export default function FormBuilderPage() {
                     ))}
                   </div>
                   <div className="py-2">
-                    {connectedDatabase && selectedTable && (
+                    {connectedSchemaId && selectedTableId && connectedSchema && (
                       <div className="flex items-center gap-2 mb-4">
                         <Database className="h-4 w-4 text-blue-500" />
                         <span className="text-sm text-muted-foreground">
                           Este formulario guardará datos en tu base de datos conectada{" "}
-                          {databaseTemplates[connectedDatabase]?.name}
+                          {connectedSchema.name}
                         </span>
                       </div>
                     )}
@@ -1111,6 +1303,12 @@ export default function FormBuilderPage() {
                 size="sm"
                 onClick={async () => {
                   try {
+                    console.log('🔵 Guardando cambios...')
+                    toast.loading('Guardando cambios...', { id: 'save-form', duration: Infinity })
+                    
+                    // Store old field IDs before saving
+                    const oldFieldIds = formElements.map(el => el.id)
+                    
                     const payload = {
                       fields: formElements.map((el, idx) => ({
                         type: el.type,
@@ -1124,17 +1322,104 @@ export default function FormBuilderPage() {
                         dbField: el.dbField,
                       })),
                     }
+                    
+                    console.log('📤 Enviando payload:', payload)
+                    
                     const res = await fetch(`/api/forms/${formId}/publish-fields`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify(payload),
                     })
+                    
                     if (!res.ok) {
-                      console.error('Publish failed')
+                      const errorData = await res.json().catch(() => ({}))
+                      console.error('❌ Error al guardar:', errorData)
+                      toast.error('Error al guardar', {
+                        id: 'save-form',
+                        description: errorData.error || 'No se pudieron guardar los cambios',
+                        duration: 5000
+                      })
                       return
                     }
-                  } catch (e) {
-                    console.error(e)
+                    
+                    const result = await res.json()
+                    console.log('✅ Guardado exitoso:', result)
+                    
+                    // Fetch the newly created fields to get their new IDs
+                    const fieldsResponse = await fetch(`/api/form-fields?form_id=${formId}`)
+                    if (fieldsResponse.ok) {
+                      const newFields = await fieldsResponse.json()
+                      console.log('🔄 Nuevos campos con IDs:', newFields)
+                      
+                      // Create mapping from old IDs to new IDs based on position
+                      const idMapping: Record<number, number> = {}
+                      oldFieldIds.forEach((oldId, idx) => {
+                        const newField = newFields.find((f: any) => f.position === idx)
+                        if (newField) {
+                          idMapping[oldId] = newField.id
+                        }
+                      })
+                      console.log('🗺️ Mapeo de IDs (viejo -> nuevo):', idMapping)
+                      
+                      // Update formElements with new IDs
+                      const updatedElements = formElements.map((el, idx) => {
+                        const newField = newFields.find((f: any) => f.position === idx)
+                        return newField ? {
+                          ...el,
+                          id: newField.id
+                        } : el
+                      })
+                      setFormElements(updatedElements)
+                      
+                      // Update fieldMappings with new IDs
+                      if (Object.keys(fieldMappings).length > 0) {
+                        const updatedMappings: Record<number, number> = {}
+                        Object.entries(fieldMappings).forEach(([oldFieldId, virtualFieldId]) => {
+                          const newFieldId = idMapping[Number(oldFieldId)]
+                          if (newFieldId) {
+                            updatedMappings[newFieldId] = virtualFieldId
+                          }
+                        })
+                        console.log('🔄 Mapeos actualizados:', updatedMappings)
+                        setFieldMappings(updatedMappings)
+                        
+                        // Re-save field mappings if we have a data connection
+                        if (dataConnectionId && Object.keys(updatedMappings).length > 0) {
+                          const mappingsToSave = Object.entries(updatedMappings).map(([formFieldId, virtualFieldId]) => ({
+                            data_connection_id: dataConnectionId,
+                            form_field_id: Number(formFieldId),
+                            virtual_field_schema_id: virtualFieldId,
+                            changes: null,
+                          }))
+                          
+                          console.log('💾 Re-guardando mapeos de campos:', mappingsToSave)
+                          const mappingsResponse = await fetch('/api/field-mappings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(mappingsToSave),
+                          })
+                          
+                          if (mappingsResponse.ok) {
+                            console.log('✅ Mapeos de campos guardados exitosamente')
+                          } else {
+                            console.error('❌ Error guardando mapeos:', await mappingsResponse.text())
+                          }
+                        }
+                      }
+                    }
+                    
+                    toast.success('¡Cambios guardados!', {
+                      id: 'save-form',
+                      description: `Se guardaron ${result.inserted || 0} campos exitosamente`,
+                      duration: 5000
+                    })
+                  } catch (e: any) {
+                    console.error('❌ Error inesperado:', e)
+                    toast.error('Error al guardar', {
+                      id: 'save-form',
+                      description: e?.message || 'Ocurrió un error inesperado',
+                      duration: 5000
+                    })
                   }
                 }}
               >
@@ -1144,10 +1429,14 @@ export default function FormBuilderPage() {
             </div>
           </header>
           <div className="flex flex-1">
-            <aside className="w-[250px] flex-col border-r bg-muted/40 md:flex overflow-auto">
+            <aside 
+              ref={sidebarRef}
+              className="flex-col border-r bg-muted/40 md:flex overflow-auto relative"
+              style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '500px' }}
+            >
               <div className="p-4 border-b">
-                <h2 className="font-semibold mb-2">Elementos del Formulario</h2>
-                <div className="grid grid-cols-2 gap-2">
+                <h2 className="font-semibold mb-2 text-sm">Elementos del Formulario</h2>
+                <div className="grid gap-2" style={{ gridTemplateColumns: sidebarWidth < 280 ? '1fr' : 'repeat(2, 1fr)' }}>
                   {fieldTypes.map((field) => (
                     <div
                       key={field.type}
@@ -1156,21 +1445,21 @@ export default function FormBuilderPage() {
                       className="flex items-center gap-2 p-2 border rounded-md cursor-move hover:bg-muted transition-colors"
                     >
                       {field.icon}
-                      <span className="text-sm">{field.label}</span>
+                      <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">{field.label}</span>
                     </div>
                   ))}
                 </div>
               </div>
               <div className="p-4 border-b">
-                <h2 className="font-semibold mb-2">Elementos de Diseño</h2>
-                <div className="grid grid-cols-2 gap-2">
+                <h2 className="font-semibold mb-2 text-sm">Elementos de Diseño</h2>
+                <div className="grid gap-2" style={{ gridTemplateColumns: sidebarWidth < 280 ? '1fr' : 'repeat(2, 1fr)' }}>
                   <div
                     draggable
                     onDragStart={(e) => handleDragStart(e, "section")}
                     className="flex items-center gap-2 p-2 border rounded-md cursor-move hover:bg-muted transition-colors"
                   >
                     <LayoutGrid className="h-4 w-4" />
-                    <span className="text-sm">Sección</span>
+                    <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">Sección</span>
                   </div>
                   <div
                     draggable
@@ -1178,7 +1467,7 @@ export default function FormBuilderPage() {
                     className="flex items-center gap-2 p-2 border rounded-md cursor-move hover:bg-muted transition-colors"
                   >
                     <Minus className="h-4 w-4" />
-                    <span className="text-sm">Divisor</span>
+                    <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">Divisor</span>
                   </div>
                 </div>
               </div>
@@ -1186,6 +1475,16 @@ export default function FormBuilderPage() {
                 <div className="p-4">{renderFieldSettings(formElements.find((el) => el.id === showFieldSettings))}</div>
               )}
             </aside>
+            {/* Resize Handle */}
+            <div
+              className="w-1 bg-border hover:bg-primary/50 cursor-col-resize transition-colors relative group"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setIsResizing(true)
+              }}
+            >
+              <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-primary/10" />
+            </div>
             <main className="flex flex-1 flex-col">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
                 <div className="border-b">
@@ -1433,12 +1732,13 @@ export default function FormBuilderPage() {
                               <p className="text-sm text-muted-foreground">Store form submissions in your database</p>
                             </div>
                             <Switch
-                              checked={!!connectedDatabase}
+                              checked={!!connectedSchemaId}
                               onCheckedChange={(checked) => {
                                 if (!checked) {
-                                  setConnectedDatabase(null)
-                                  setSelectedTable(null)
+                                  setConnectedSchemaId(null)
+                                  setSelectedTableId(null)
                                   setFieldMappings({})
+                                  setConnectedSchema(null)
                                 } else {
                                   setShowDatabaseConnect(true)
                                 }
@@ -1446,19 +1746,19 @@ export default function FormBuilderPage() {
                             />
                           </div>
 
-                          {connectedDatabase && (
+                          {connectedSchemaId && connectedSchema && (
                             <div className="p-4 mt-2 border rounded-md bg-blue-50/30">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                   <Database className="h-4 w-4 text-blue-600" />
-                                  <span className="font-medium">{databaseTemplates[connectedDatabase]?.name}</span>
+                                  <span className="font-medium">{connectedSchema.name}</span>
                                 </div>
                                 <Badge variant="outline" className="bg-blue-100 text-blue-700">
                                   Connected
                                 </Badge>
                               </div>
                               <div className="text-sm text-muted-foreground mb-3">
-                                Your form is connected to the <span className="font-medium">{selectedTable}</span> table
+                                Your form is connected to the <span className="font-medium">{connectedSchema?.tables?.find((t: any) => t.id === selectedTableId)?.name || "table"}</span> table
                               </div>
                               <div className="flex items-center justify-between">
                                 <div className="text-sm">
@@ -1631,8 +1931,20 @@ export default function FormBuilderPage() {
           </div>
 
           {/* Database Connection Dialog */}
-          <Dialog open={showDatabaseConnect} onOpenChange={setShowDatabaseConnect}>
-            <DialogContent className="sm:max-w-[600px]">
+          <Dialog 
+            open={showDatabaseConnect} 
+            onOpenChange={(open) => {
+              if (open) {
+                console.log('🚀 Opening database dialog')
+                console.log('📋 Form elements:', formElements.map(el => ({ id: el.id, label: el.label })))
+                console.log('🗺️ Current field mappings:', fieldMappings)
+                console.log('🔗 Connected schema ID:', connectedSchemaId)
+                console.log('📊 Selected table ID:', selectedTableId)
+              }
+              setShowDatabaseConnect(open)
+            }}
+          >
+            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Conectar Base de Datos</DialogTitle>
                 <DialogDescription>
@@ -1644,11 +1956,36 @@ export default function FormBuilderPage() {
                 <div className="space-y-2">
                   <Label htmlFor="database-select">Seleccionar Base de Datos</Label>
                   <Select
-                    value={connectedDatabase || "none"}
-                    onValueChange={(value) => {
-                      setConnectedDatabase(value === "none" ? null : value)
-                      setSelectedTable(null)
-                      setFieldMappings({})
+                    value={connectedSchemaId?.toString() || "none"}
+                    onValueChange={async (value) => {
+                      if (value === "none") {
+                        setConnectedSchemaId(null)
+                        setConnectedSchema(null)
+                        setSelectedTableId(null)
+                        setFieldMappings({})
+                      } else if (value === "new") {
+                        window.open("/dashboard/databases/new", "_blank")
+                      } else {
+                        setConnectedSchemaId(Number(value))
+                        setSelectedTableId(null)
+                        setFieldMappings({})
+                        // Fetch the full schema with tables and fields
+                        setLoadingSchemas(true)
+                        try {
+                          const schemaResponse = await fetch(`/api/virtual-schemas/${value}/tree`)
+                          if (schemaResponse.ok) {
+                            const schema = await schemaResponse.json()
+                            console.log('Fetched schema tree:', schema)
+                            setConnectedSchema(schema)
+                          } else {
+                            console.error('Failed to fetch schema tree:', schemaResponse.status)
+                          }
+                        } catch (err) {
+                          console.error('Error fetching schema tree:', err)
+                        } finally {
+                          setLoadingSchemas(false)
+                        }
+                      }
                     }}
                   >
                     <SelectTrigger id="database-select">
@@ -1656,22 +1993,35 @@ export default function FormBuilderPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Ninguna (Desconectar)</SelectItem>
-                      {Object.values(databaseTemplates).map((db) => (
-                        <SelectItem key={db.id} value={db.id}>
-                          {db.name}
+                      {availableSchemas.length === 0 ? (
+                        <SelectItem value="empty" disabled>
+                          No hay bases de datos disponibles
                         </SelectItem>
-                      ))}
+                      ) : (
+                        availableSchemas.map((schema) => (
+                          <SelectItem key={schema.id} value={schema.id.toString()}>
+                            {schema.name} {schema.is_template ? '(Plantilla)' : ''}
+                          </SelectItem>
+                        ))
+                      )}
+                      <Separator className="my-2" />
+                      <SelectItem value="new">
+                        <div className="flex items-center">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Crear Nueva Base de Datos
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {connectedDatabase && (
+                {connectedSchemaId && connectedSchema && (
                   <div className="space-y-2">
                     <Label htmlFor="table-select">Seleccionar Tabla</Label>
                     <Select
-                      value={selectedTable || "none"}
+                      value={selectedTableId?.toString() || "none"}
                       onValueChange={(value) => {
-                        setSelectedTable(value === "none" ? null : value)
+                        setSelectedTableId(value === "none" ? null : Number(value))
                         setFieldMappings({})
                       }}
                     >
@@ -1679,8 +2029,8 @@ export default function FormBuilderPage() {
                         <SelectValue placeholder="Selecciona una tabla" />
                       </SelectTrigger>
                       <SelectContent>
-                        {databaseTemplates[connectedDatabase]?.tables.map((table: any) => (
-                          <SelectItem key={table.id} value={table.name}>
+                        {connectedSchema?.tables?.map((table: any) => (
+                          <SelectItem key={table.id} value={table.id.toString()}>
                             {table.name}
                           </SelectItem>
                         ))}
@@ -1689,7 +2039,7 @@ export default function FormBuilderPage() {
                   </div>
                 )}
 
-                {connectedDatabase && selectedTable && (
+                {connectedSchemaId && selectedTableId && connectedSchema && (
                   <>
                     <div className="flex items-center space-x-2 pt-2">
                       <Checkbox
@@ -1723,11 +2073,11 @@ export default function FormBuilderPage() {
                                 </TableCell>
                                 <TableCell>
                                   <Select
-                                    value={fieldMappings[element.id] || "not-mapped"}
+                                    value={fieldMappings[element.id]?.toString() || "not-mapped"}
                                     onValueChange={(value) => {
                                       const newMappings = { ...fieldMappings }
                                       if (value !== "not-mapped") {
-                                        newMappings[element.id] = value
+                                        newMappings[element.id] = Number(value)
                                       } else {
                                         delete newMappings[element.id]
                                       }
@@ -1739,11 +2089,11 @@ export default function FormBuilderPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="not-mapped">Sin mapear</SelectItem>
-                                      {databaseTemplates[connectedDatabase]?.tables
-                                        .find((t: any) => t.name === selectedTable)
-                                        ?.fields.filter((f: any) => f.type !== "id")
+                                      {connectedSchema?.tables
+                                        ?.find((t: any) => t.id === selectedTableId)
+                                        ?.fields?.filter((f: any) => f.type !== "id" && f.name !== "id")
                                         .map((field: any) => (
-                                          <SelectItem key={field.id} value={field.name}>
+                                          <SelectItem key={field.id} value={field.id.toString()}>
                                             {field.name} ({field.type})
                                           </SelectItem>
                                         ))}
@@ -1763,7 +2113,7 @@ export default function FormBuilderPage() {
                         <div>
                           <p className="text-sm font-medium text-blue-700">Cómo se guardan los datos del formulario</p>
                           <p className="text-sm text-blue-600">
-                            Los envíos del formulario se almacenarán como nuevos registros en la tabla {selectedTable}.
+                            Los envíos del formulario se almacenarán como nuevos registros en la tabla {connectedSchema?.tables?.find((t: any) => t.id === selectedTableId)?.name}.
                             Los campos mapeados guardarán datos en los campos correspondientes de la base de datos. Los
                             campos que no estén mapeados no se guardarán.
                           </p>
@@ -1777,7 +2127,7 @@ export default function FormBuilderPage() {
                 <Button variant="outline" onClick={() => setShowDatabaseConnect(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleConnectToDatabase} disabled={!connectedDatabase || !selectedTable}>
+                <Button onClick={handleConnectToDatabase} disabled={!connectedSchemaId || !selectedTableId}>
                   Conectar Base de Datos
                 </Button>
               </DialogFooter>

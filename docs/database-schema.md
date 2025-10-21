@@ -84,15 +84,25 @@ CREATE TABLE "VirtualSchema" (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   user_id INTEGER REFERENCES "User"(id) ON DELETE CASCADE,
+  template_type VARCHAR(100),
+  is_template BOOLEAN DEFAULT FALSE,
+  icon VARCHAR(50),
+  color VARCHAR(50),
+  category VARCHAR(100),
   configs JSONB,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
-**Propósito**: Simula bases de datos creadas por usuarios
+**Propósito**: Simula bases de datos creadas por usuarios o plantillas del sistema
 **Relaciones**: Un usuario puede tener múltiples esquemas virtuales
 **Configuraciones**: Tipo de base de datos, modo avanzado, método de creación
+**Plantillas del Sistema**: 
+- `is_template`: Indica si es una plantilla disponible para todos los usuarios
+- `template_type`: Identificador único (customers, products, orders, employees)
+- `icon`, `color`, `category`: Metadatos para visualización en la UI
+- user_id puede ser NULL para plantillas del sistema
 
 ### 5. Tablas Virtuales (VirtualTableSchema)
 ```sql
@@ -132,14 +142,18 @@ CREATE TABLE "DataConnection" (
   id SERIAL PRIMARY KEY,
   form_id INTEGER REFERENCES "Form"(id) ON DELETE CASCADE,
   virtual_schema_id INTEGER REFERENCES "VirtualSchema"(id) ON DELETE CASCADE,
+  virtual_table_schema_id INTEGER REFERENCES "VirtualTableSchema"(id) ON DELETE CASCADE,
   configs JSONB,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
-**Propósito**: Vincula formularios con esquemas virtuales
-**Relaciones**: Conecta formularios con bases de datos de destino
+**Propósito**: Vincula formularios con esquemas virtuales y tablas específicas
+**Relaciones**: 
+- Conecta formularios con bases de datos (virtual_schema_id)
+- Especifica la tabla de destino (virtual_table_schema_id)
+**Configs**: Configuración adicional de sincronización, filtros, etc.
 
 ### 8. Mapeo de Campos (FieldMapping)
 ```sql

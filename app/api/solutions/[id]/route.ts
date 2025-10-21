@@ -7,10 +7,10 @@ const supabase = createClient();
 // Get a single solution by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(req.url);
     const includeComponents = searchParams.get('includeComponents') === 'true';
 
@@ -47,10 +47,10 @@ export async function GET(
 // Update a solution
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json() as Partial<Solution>;
 
     // Update modification_date
@@ -84,10 +84,10 @@ export async function PUT(
 // Delete a solution
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Delete the solution (SolutionComponents will be deleted automatically due to CASCADE)
     const { error } = await supabase

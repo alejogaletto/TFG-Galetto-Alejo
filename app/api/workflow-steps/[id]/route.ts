@@ -6,8 +6,8 @@ import { WorkflowStep } from '@/lib/types';
 const supabase = createClient();
 
 // Get a single workflow step by ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('WorkflowStep').select('*').eq('id', id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Workflow step not found' }, { status: 404 });
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Update a workflow step by ID
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { type, position, configs, external_services } = await req.json() as WorkflowStep;
   const { data, error } = await supabase.from('WorkflowStep').update({ type, position, configs, external_services }).eq('id', id).select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -24,8 +24,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Delete a workflow step by ID
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('WorkflowStep').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });

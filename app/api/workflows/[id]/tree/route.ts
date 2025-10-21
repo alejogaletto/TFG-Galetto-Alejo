@@ -3,8 +3,8 @@ import { createClient } from '@/lib/supabase-client';
 
 const supabase = createClient();
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const workflowId = parseInt(params.id);
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const workflowId = parseInt((await params).id);
   
   if (isNaN(workflowId)) {
     return NextResponse.json({ error: 'Invalid workflow ID' }, { status: 400 });

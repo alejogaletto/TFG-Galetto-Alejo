@@ -30,7 +30,9 @@ export type FormField = {
 export type DataConnection = {
   id: number;
   form_id?: number;
+  virtual_schema_id?: number;
   virtual_table_schema_id?: number;
+  configs?: any;
   creation_date?: string;
 };
 

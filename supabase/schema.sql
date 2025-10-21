@@ -32,6 +32,11 @@ CREATE TABLE "VirtualSchema" (
   "user_id" INTEGER REFERENCES "User"("id"),
   "name" VARCHAR(255),
   "description" TEXT,
+  "template_type" VARCHAR(100),
+  "is_template" BOOLEAN DEFAULT FALSE,
+  "icon" VARCHAR(50),
+  "color" VARCHAR(50),
+  "category" VARCHAR(100),
   "configs" JSONB,
   "creation_date" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -48,7 +53,9 @@ CREATE TABLE "VirtualTableSchema" (
 CREATE TABLE "DataConnection" (
   "id" SERIAL PRIMARY KEY,
   "form_id" INTEGER REFERENCES "Form"("id"),
+  "virtual_schema_id" INTEGER REFERENCES "VirtualSchema"("id"),
   "virtual_table_schema_id" INTEGER REFERENCES "VirtualTableSchema"("id"),
+  "configs" JSONB,
   "creation_date" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -136,3 +143,13 @@ CREATE INDEX "idx_solution_template_type" ON "Solution"("template_type");
 CREATE INDEX "idx_solution_is_template" ON "Solution"("is_template");
 CREATE INDEX "idx_solution_component_solution_id" ON "SolutionComponent"("solution_id");
 CREATE INDEX "idx_solution_component_type_id" ON "SolutionComponent"("component_type", "component_id");
+
+-- Indexes for VirtualSchema templates
+CREATE INDEX "idx_virtualschema_user_id" ON "VirtualSchema"("user_id");
+CREATE INDEX "idx_virtualschema_is_template" ON "VirtualSchema"("is_template");
+CREATE INDEX "idx_virtualschema_template_type" ON "VirtualSchema"("template_type");
+
+-- Indexes for DataConnection
+CREATE INDEX "idx_dataconnection_form_id" ON "DataConnection"("form_id");
+CREATE INDEX "idx_dataconnection_virtual_schema_id" ON "DataConnection"("virtual_schema_id");
+CREATE INDEX "idx_dataconnection_virtual_table_schema_id" ON "DataConnection"("virtual_table_schema_id");

@@ -3,9 +3,10 @@ import { createClient } from "@/lib/supabase-client"
 
 const supabase = createClient()
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const formId = Number(params.id)
+    const { id } = await params
+    const formId = Number(id)
     if (!formId) return NextResponse.json({ error: "Invalid form id" }, { status: 400 })
 
     const { fields } = await req.json().catch(() => ({}))

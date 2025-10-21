@@ -6,8 +6,8 @@ import { Workflow } from '@/lib/types';
 const supabase = createClient();
 
 // Get a single workflow by ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { searchParams } = new URL(req.url);
   const includeSteps = searchParams.get('includeSteps') === 'true';
 
@@ -46,8 +46,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Update a workflow by ID
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { name, description, configs, is_active } = await req.json() as Workflow;
   const { data, error } = await supabase.from('Workflow').update({ name, description, configs, is_active }).eq('id', id).select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,8 +55,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // Delete a workflow by ID
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data, error } = await supabase.from('Workflow').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });

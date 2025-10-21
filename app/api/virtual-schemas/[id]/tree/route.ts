@@ -5,8 +5,9 @@ const supabase = createClient()
 
 // GET /api/virtual-schemas/[id]/tree
 // Returns one VirtualSchema with nested VirtualTableSchemas and VirtualFieldSchemas
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const schemaId = Number(params.id)
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const schemaId = Number(id)
   if (!schemaId || Number.isNaN(schemaId)) {
     return NextResponse.json({ error: "Invalid schema id" }, { status: 400 })
   }
