@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Database, Plus, Search, Package, Loader2 } from "lucide-react"
+import { Database, Plus, Search, Package, Loader2, Home, FileText, Workflow, BarChart3, Settings } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -112,81 +112,62 @@ export default function DatabasesPage() {
             <Link className="text-sm font-medium" href="/dashboard/workflows">
               Flujos de Trabajo
             </Link>
+            <Link className="text-sm font-medium" href="/dashboard/solutions">
+              Soluciones
+            </Link>
           </nav>
         </header>
         <div className="flex flex-1">
-          <aside className="hidden w-[200px] flex-col border-r bg-muted/40 md:flex">
+          <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">
             <nav className="grid gap-2 p-4">
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-                Panel
+                <Home className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Panel</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/forms"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                Formularios
+                <FileText className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Formularios</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-primary transition-all bg-muted"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all bg-muted text-primary text-sm"
                 href="/dashboard/databases"
               >
-                <Database className="h-4 w-4" />
-                Bases de Datos
+                <Database className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Bases de Datos</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/workflows"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                  <path d="m15 5 4 4" />
-                </svg>
-                Flujos de Trabajo
+                <Workflow className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Flujos de Trabajo</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/solutions"
               >
-                <Package className="h-4 w-4" />
-                Soluciones
+                <Package className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Soluciones</span>
+              </Link>
+              <Link
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+                href="/dashboard/analytics"
+              >
+                <BarChart3 className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Analíticas</span>
+              </Link>
+              <Link
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+                href="/dashboard/profile"
+              >
+                <Settings className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Mi Perfil</span>
               </Link>
             </nav>
           </aside>
@@ -223,81 +204,62 @@ export default function DatabasesPage() {
             <Link className="text-sm font-medium" href="/dashboard/workflows">
               Flujos de Trabajo
             </Link>
+            <Link className="text-sm font-medium" href="/dashboard/solutions">
+              Soluciones
+            </Link>
           </nav>
         </header>
         <div className="flex flex-1">
-          <aside className="hidden w-[200px] flex-col border-r bg-muted/40 md:flex">
+          <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">
             <nav className="grid gap-2 p-4">
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-                Panel
+                <Home className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Panel</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/forms"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                Formularios
+                <FileText className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Formularios</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-primary transition-all bg-muted"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all bg-muted text-primary text-sm"
                 href="/dashboard/databases"
               >
-                <Database className="h-4 w-4" />
-                Bases de Datos
+                <Database className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Bases de Datos</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/workflows"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                  <path d="m15 5 4 4" />
-                </svg>
-                Flujos de Trabajo
+                <Workflow className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Flujos de Trabajo</span>
               </Link>
               <Link
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/solutions"
               >
-                <Package className="h-4 w-4" />
-                Soluciones
+                <Package className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Soluciones</span>
+              </Link>
+              <Link
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+                href="/dashboard/analytics"
+              >
+                <BarChart3 className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Analíticas</span>
+              </Link>
+              <Link
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+                href="/dashboard/profile"
+              >
+                <Settings className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Mi Perfil</span>
               </Link>
             </nav>
           </aside>
@@ -333,81 +295,62 @@ export default function DatabasesPage() {
           <Link className="text-sm font-medium" href="/dashboard/workflows">
             Flujos de Trabajo
           </Link>
+          <Link className="text-sm font-medium" href="/dashboard/solutions">
+            Soluciones
+          </Link>
         </nav>
       </header>
       <div className="flex flex-1">
-        <aside className="hidden w-[200px] flex-col border-r bg-muted/40 md:flex">
+        <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">
           <nav className="grid gap-2 p-4">
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-              Panel
+              <Home className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Panel</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/forms"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              Formularios
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Formularios</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-primary transition-all bg-muted"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all bg-muted text-primary text-sm"
               href="/dashboard/databases"
             >
-              <Database className="h-4 w-4" />
-              Bases de Datos
+              <Database className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Bases de Datos</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/workflows"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                <path d="m15 5 4 4" />
-              </svg>
-              Flujos de Trabajo
+              <Workflow className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Flujos de Trabajo</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/solutions"
             >
-              <Package className="h-4 w-4" />
-              Soluciones
+              <Package className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Soluciones</span>
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+              href="/dashboard/analytics"
+            >
+              <BarChart3 className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Analíticas</span>
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+              href="/dashboard/profile"
+            >
+              <Settings className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Mi Perfil</span>
             </Link>
           </nav>
         </aside>

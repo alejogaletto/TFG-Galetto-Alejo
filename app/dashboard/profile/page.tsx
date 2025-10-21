@@ -273,7 +273,7 @@ export default function ProfilePage() {
             <div className="text-red-500 mb-4">⚠️</div>
             <h2 className="text-lg font-semibold mb-2">Error de Perfil</h2>
             <p className="text-muted-foreground mb-4">No se pudo cargar la información del perfil</p>
-            <Button onClick={() => router.push("/dashboard")}>Volver al Dashboard</Button>
+            <Button onClick={() => router.push("/dashboard")}>Volver al Panel</Button>
           </div>
         </div>
       </div>

@@ -589,7 +589,7 @@ export default function SolutionDetailPage() {
               <Button variant="outline" asChild>
                 <Link href={`/dashboard/solutions/builder/advanced?id=${solutionId}`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Editar Dashboard
+                  Editar Panel
                 </Link>
               </Button>
             </div>

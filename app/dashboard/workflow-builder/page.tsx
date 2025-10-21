@@ -645,19 +645,19 @@ export default function WorkflowBuilderPage() {
         </Link>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
-            Dashboard
+            Panel
           </Link>
           <Link className="text-sm font-medium" href="/dashboard/forms">
-            Forms
+            Formularios
           </Link>
           <Link className="text-sm font-medium" href="/dashboard/databases">
-            Databases
+            Bases de Datos
           </Link>
           <Link className="text-sm font-medium text-primary" href="/dashboard/workflows">
-            Workflows
+            Flujos de Trabajo
           </Link>
           <Link className="text-sm font-medium" href="/dashboard/solutions">
-            Solutions
+            Soluciones
           </Link>
         </nav>
         <div className="ml-auto flex items-center gap-2">

@@ -30,6 +30,9 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
+  Home,
+  Workflow,
+  Package,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -45,13 +48,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { WorkflowEngine, Workflow } from "@/lib/workflow-engine"
+import { WorkflowEngine, Workflow as WorkflowType } from "@/lib/workflow-engine"
 
 export default function WorkflowsPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
-  const [workflows, setWorkflows] = useState<Workflow[]>([])
+  const [workflows, setWorkflows] = useState<WorkflowType[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Initialize workflow engine and load workflows
@@ -242,7 +245,7 @@ export default function WorkflowsPage() {
         </Link>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
-            Dashboard
+            Panel
           </Link>
           <Link className="text-sm font-medium" href="/dashboard/forms">
             Formularios
@@ -260,42 +263,56 @@ export default function WorkflowsPage() {
       </header>
 
       <div className="flex flex-1">
-        <aside className="hidden w-[200px] flex-col border-r bg-muted/40 md:flex">
+        <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">
           <nav className="grid gap-2 p-4">
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard"
             >
-              <BarChart3 className="h-4 w-4" />
-              Panel
+              <Home className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Panel</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/forms"
             >
-              <FileText className="h-4 w-4" />
-              Formularios
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Formularios</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/databases"
             >
-              <Database className="h-4 w-4" />
-              Bases de Datos
+              <Database className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Bases de Datos</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-primary transition-all bg-muted"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all bg-muted text-primary text-sm"
               href="/dashboard/workflows"
             >
-              <GitBranch className="h-4 w-4" />
-              Flujos de Trabajo
+              <Workflow className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Flujos de Trabajo</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/solutions"
             >
-              <Users className="h-4 w-4" />
-              Soluciones
+              <Package className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Soluciones</span>
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+              href="/dashboard/analytics"
+            >
+              <BarChart3 className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Analíticas</span>
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+              href="/dashboard/profile"
+            >
+              <Settings className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Mi Perfil</span>
             </Link>
           </nav>
         </aside>

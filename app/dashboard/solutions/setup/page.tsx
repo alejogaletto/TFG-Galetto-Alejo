@@ -253,7 +253,7 @@ export default function SolutionSetupPage() {
           </CardHeader>
           <CardFooter>
             <Button asChild className="w-full">
-              <Link href="/dashboard/solutions">Return to Solutions</Link>
+              <Link href="/dashboard/solutions">Volver a Soluciones</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -299,10 +299,10 @@ export default function SolutionSetupPage() {
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
             <Button asChild className="w-full">
-              <Link href={`/dashboard/solutions/${solutionId}`}>Go to Solution Dashboard</Link>
+              <Link href={`/dashboard/solutions/${solutionId}`}>Ir al Panel de Solución</Link>
             </Button>
             <Button variant="outline" asChild className="w-full">
-              <Link href="/dashboard/solutions">Return to Solutions</Link>
+              <Link href="/dashboard/solutions">Volver a Soluciones</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -315,24 +315,24 @@ export default function SolutionSetupPage() {
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
         <Link href="/dashboard/solutions" className="flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
-          <span className="font-medium">Back to Solutions</span>
+          <span className="font-medium">Volver a Soluciones</span>
         </Link>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={prevStep} disabled={currentStep === 1 || isLoading}>
-            Back
+            Atrás
           </Button>
           <Button size="sm" onClick={nextStep} disabled={isLoading}>
             {currentStep === 5 ? (
               isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Setting Up...
+                  Configurando...
                 </>
               ) : (
-                "Complete Setup"
+                "Completar Configuración"
               )
             ) : (
-              "Continue"
+              "Continuar"
             )}
           </Button>
         </div>
@@ -374,19 +374,19 @@ export default function SolutionSetupPage() {
                 <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary mr-2">
                   {currentStep > 3 ? <Check className="h-3 w-3" /> : "3"}
                 </div>
-                <span className="text-sm">Forms</span>
+                <span className="text-sm">Formularios</span>
               </div>
               <div className={`flex items-center ${currentStep >= 4 ? "text-primary" : "text-muted-foreground"}`}>
                 <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary mr-2">
                   {currentStep > 4 ? <Check className="h-3 w-3" /> : "4"}
                 </div>
-                <span className="text-sm">Databases</span>
+                <span className="text-sm">Bases de Datos</span>
               </div>
               <div className={`flex items-center ${currentStep >= 5 ? "text-primary" : "text-muted-foreground"}`}>
                 <div className="flex h-6 w-6 items-center justify-center rounded-full border border-primary mr-2">
                   {currentStep > 5 ? <Check className="h-3 w-3" /> : "5"}
                 </div>
-                <span className="text-sm">Workflows</span>
+                <span className="text-sm">Flujos de Trabajo</span>
               </div>
             </div>
           </div>
@@ -472,7 +472,7 @@ export default function SolutionSetupPage() {
             {/* Step 3: Forms */}
             {currentStep === 3 && (
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Configure Forms</h2>
+                <h2 className="text-xl font-semibold">Configurar Formularios</h2>
                 <p className="text-muted-foreground">
                   Select which forms you want to include in your solution. These forms will be used to collect data.
                 </p>
@@ -516,7 +516,7 @@ export default function SolutionSetupPage() {
             {/* Step 4: Databases */}
             {currentStep === 4 && (
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Configure Databases</h2>
+                <h2 className="text-xl font-semibold">Configurar Bases de Datos</h2>
                 <p className="text-muted-foreground">
                   Select which databases you want to include. These will store the data for your solution.
                 </p>
@@ -564,7 +564,7 @@ export default function SolutionSetupPage() {
             {/* Step 5: Workflows */}
             {currentStep === 5 && (
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold">Configure Workflows</h2>
+                <h2 className="text-xl font-semibold">Configurar Flujos de Trabajo</h2>
                 <p className="text-muted-foreground">
                   Select which automated workflows you want to include. These will help automate your business
                   processes.

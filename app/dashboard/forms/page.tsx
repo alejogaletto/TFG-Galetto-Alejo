@@ -18,6 +18,10 @@ import {
   Webhook,
   Package,
   Eye,
+  Home,
+  Workflow,
+  BarChart3,
+  Settings,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -255,7 +259,7 @@ export default function FormsPage() {
         </Link>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
-            Panel de Control
+            Panel
           </Link>
           <Link className="text-sm font-medium text-primary" href="/dashboard/forms">
             Formularios
@@ -272,93 +276,56 @@ export default function FormsPage() {
         </nav>
       </header>
       <div className="flex flex-1">
-        <aside className="hidden w-[200px] flex-col border-r bg-muted/40 md:flex">
+        <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">
           <nav className="grid gap-2 p-4">
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-              Panel de Control
+              <Home className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Panel</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-primary transition-all bg-muted"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all bg-muted text-primary text-sm"
               href="/dashboard/forms"
             >
-              <FileText className="h-4 w-4" />
-              Formularios
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Formularios</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-              href="/dashboard/form-submissions"
-            >
-              <FileText className="h-4 w-4" />
-              Envíos de Formulario
-            </Link>
-            <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-              href="/dashboard/form-analytics"
-            >
-              <FileText className="h-4 w-4" />
-              Analítica de Formularios
-            </Link>
-            <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/databases"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <ellipse cx="12" cy="5" rx="9" ry="3" />
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
-              </svg>
-              Bases de Datos
+              <Database className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Bases de Datos</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/workflows"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                <path d="m15 5 4 4" />
-              </svg>
-              Flujos de Trabajo
+              <Workflow className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Flujos de Trabajo</span>
             </Link>
             <Link
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
               href="/dashboard/solutions"
             >
-              <Package className="h-4 w-4" />
-              Soluciones
+              <Package className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Soluciones</span>
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+              href="/dashboard/analytics"
+            >
+              <BarChart3 className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Analíticas</span>
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
+              href="/dashboard/profile"
+            >
+              <Settings className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Mi Perfil</span>
             </Link>
           </nav>
         </aside>

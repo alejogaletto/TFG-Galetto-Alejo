@@ -1237,7 +1237,7 @@ export default function FormBuilderPage() {
             </div>
             <nav className="hidden flex-1 items-center gap-6 md:flex">
               <Link className="text-sm font-medium" href="/dashboard">
-                Dashboard
+                Panel
               </Link>
               <Link className="text-sm font-medium text-primary" href="/dashboard/forms">
                 Formularios
