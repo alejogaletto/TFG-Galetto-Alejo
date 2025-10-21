@@ -157,13 +157,6 @@ export default function DatabasesPage() {
               </Link>
               <Link
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
-                href="/dashboard/analytics"
-              >
-                <BarChart3 className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">Analíticas</span>
-              </Link>
-              <Link
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/profile"
               >
                 <Settings className="h-4 w-4 flex-shrink-0" />
@@ -249,13 +242,6 @@ export default function DatabasesPage() {
               </Link>
               <Link
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
-                href="/dashboard/analytics"
-              >
-                <BarChart3 className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">Analíticas</span>
-              </Link>
-              <Link
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
                 href="/dashboard/profile"
               >
                 <Settings className="h-4 w-4 flex-shrink-0" />
@@ -337,13 +323,6 @@ export default function DatabasesPage() {
             >
               <Package className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">Soluciones</span>
-            </Link>
-            <Link
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
-              href="/dashboard/analytics"
-            >
-              <BarChart3 className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">Analíticas</span>
             </Link>
             <Link
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary text-sm"
