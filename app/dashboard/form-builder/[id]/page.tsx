@@ -498,6 +498,69 @@ export default function FormBuilderPage() {
     if (!connectedSchemaId || !selectedTableId) return
 
     try {
+      // Work with a copy of formElements that we'll update if needed
+      let currentFormElements = formElements
+
+      // Check if form fields need to be saved first
+      const hasUnsavedFields = currentFormElements.some((el: any) => {
+        // Check if this field exists in the database by trying to verify its ID
+        // New fields typically have low IDs (1, 2, 3...) while saved fields have higher IDs
+        return el.id < 100
+      })
+
+      if (hasUnsavedFields && currentFormElements.length > 0) {
+        console.log('⚠️ Form has unsaved fields. Saving fields first...')
+        alert('Guardando campos del formulario antes de conectar la base de datos...')
+        
+        // Save form fields first
+        const payload = {
+          fields: currentFormElements.map((element: any, index: number) => ({
+            type: element.type,
+            label: element.label,
+            position: index,
+            configs: {
+              placeholder: element.placeholder,
+              required: element.required,
+              helpText: element.helpText,
+              options: element.options,
+              rows: element.rows,
+              dbField: element.dbField,
+            },
+          })),
+        }
+
+        const saveResponse = await fetch(`/api/forms/${formId}/publish-fields`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!saveResponse.ok) {
+          alert('Error: No se pudieron guardar los campos. Por favor intenta guardar manualmente primero.')
+          return
+        }
+
+        // Fetch the newly saved fields to get their real IDs
+        const fieldsResponse = await fetch(`/api/form-fields?form_id=${formId}`)
+        if (!fieldsResponse.ok) {
+          alert('Error: No se pudieron cargar los campos guardados.')
+          return
+        }
+
+        const savedFields = await fieldsResponse.json()
+        console.log('✅ Fields saved with new IDs:', savedFields)
+
+        // Update formElements with real database IDs
+        const updatedElements = currentFormElements.map((el: any, idx: number) => {
+          const savedField = savedFields.find((f: any) => f.position === idx)
+          return savedField ? { ...el, id: savedField.id } : el
+        })
+        setFormElements(updatedElements)
+        currentFormElements = updatedElements
+        
+        console.log('🔄 Updated form elements with database IDs:', updatedElements.map((el: any) => ({ id: el.id, label: el.label })))
+      }
+
       // Create or update DataConnection
       const dataConnResponse = await fetch('/api/data-connections', {
         method: 'POST',
@@ -511,6 +574,7 @@ export default function FormBuilderPage() {
 
       if (!dataConnResponse.ok) {
         console.error('Failed to create/update data connection')
+        alert('Error: No se pudo crear la conexión a la base de datos.')
         return
       }
 
@@ -528,7 +592,7 @@ export default function FormBuilderPage() {
           const newMappings: Record<number, number> = {}
 
           // Try to automatically map form fields to database fields
-          formElements.forEach((element) => {
+          currentFormElements.forEach((element: any) => {
             // Find a matching database field based on type and name similarity
             const matchingField = selectedTable.fields.find((field: any) => {
               // Skip ID fields
