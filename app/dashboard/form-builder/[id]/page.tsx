@@ -321,11 +321,14 @@ export default function FormBuilderPage() {
         const dataConnResponse = await fetch(`/api/data-connections?form_id=${formId}`)
         console.log('📡 DataConnection response status:', dataConnResponse.status)
         
+        let hasDataConnection = false
+        
         if (dataConnResponse.ok) {
           const dataConn = await dataConnResponse.json()
           console.log('🔗 DataConnection found:', dataConn)
           
           if (dataConn && dataConn.id) {
+            hasDataConnection = true
             console.log('✅ Setting DataConnection state:', {
               dataConnectionId: dataConn.id,
               virtual_schema_id: dataConn.virtual_schema_id,
@@ -373,7 +376,7 @@ export default function FormBuilderPage() {
         }
 
         // Migration: Check if form has old-style database config but no DataConnection
-        if (formData.configs?.database && !dataConnectionId) {
+        if (formData.configs?.database && !hasDataConnection) {
           console.log("Migrating old database connection:", formData.configs.database)
           // Fetch all virtual schemas to find matching one
           const schemasResponse = await fetch('/api/virtual-schemas')
