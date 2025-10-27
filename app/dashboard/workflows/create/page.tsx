@@ -75,6 +75,20 @@ export default function CreateWorkflowPage() {
   const [zoomLevel, setZoomLevel] = useState(1)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const canvasRef = useRef<HTMLDivElement>(null)
+  
+  // Trigger configuration state
+  const [workflowTriggers, setWorkflowTriggers] = useState<Array<{
+    type: 'form_submission' | 'database_change';
+    sourceId: number;
+    sourceName: string;
+    config?: any;
+  }>>([])
+  const [availableForms, setAvailableForms] = useState<any[]>([])
+  const [availableTables, setAvailableTables] = useState<any[]>([])
+  const [showAddTrigger, setShowAddTrigger] = useState(false)
+  const [newTriggerType, setNewTriggerType] = useState<'form_submission' | 'database_change'>('form_submission')
+  const [newTriggerSourceId, setNewTriggerSourceId] = useState<number | null>(null)
+  const [newTriggerOperations, setNewTriggerOperations] = useState<string[]>(['create', 'update', 'delete'])
 
   const workflowEngine = WorkflowEngine.getInstance()
   const integrationsEngine = IntegrationsEngine.getInstance()
@@ -82,7 +96,37 @@ export default function CreateWorkflowPage() {
   useEffect(() => {
     workflowEngine.loadWorkflows()
     integrationsEngine.loadIntegrations()
+    
+    // Load forms and tables for trigger configuration
+    const loadTriggersData = async () => {
+      try {
+        // Load forms
+        const formsResponse = await fetch('/api/forms')
+        if (formsResponse.ok) {
+          const formsData = await formsResponse.json()
+          setAvailableForms(formsData)
+        }
+        
+        // Load tables
+        const tablesResponse = await fetch('/api/virtual-table-schemas')
+        if (tablesResponse.ok) {
+          const tablesData = await tablesResponse.json()
+          setAvailableTables(tablesData)
+        }
+      } catch (error) {
+        console.error('Error loading triggers data:', error)
+      }
+    }
+    
+    loadTriggersData()
   }, [])
+  
+  // Load workflow triggers when forms and tables are loaded (for edit mode)
+  useEffect(() => {
+    if (isEditMode && workflowData?.id && availableForms.length > 0 && availableTables.length > 0) {
+      loadWorkflowTriggers(workflowData.id)
+    }
+  }, [availableForms, availableTables, isEditMode, workflowData?.id])
 
   // Load workflow data when in edit mode
   useEffect(() => {
@@ -106,6 +150,34 @@ export default function CreateWorkflowPage() {
       })))
     }
   }, [isEditMode, workflowData?.id]) // Only depend on workflow ID, not the entire workflowData object
+  
+  // Load triggers for a workflow
+  const loadWorkflowTriggers = async (workflowId: number) => {
+    try {
+      const response = await fetch(`/api/workflow-triggers?workflow_id=${workflowId}`)
+      if (response.ok) {
+        const triggers = await response.json()
+        
+        // Convert database triggers to UI format
+        const uiTriggers = triggers.map((trigger: any) => {
+          const sourceName = trigger.trigger_type === 'form_submission'
+            ? availableForms.find(f => f.id === trigger.trigger_source_id)?.name || 'Unknown Form'
+            : availableTables.find(t => t.id === trigger.trigger_source_id)?.name || 'Unknown Table'
+          
+          return {
+            type: trigger.trigger_type,
+            sourceId: trigger.trigger_source_id,
+            sourceName,
+            config: trigger.trigger_config
+          }
+        })
+        
+        setWorkflowTriggers(uiTriggers)
+      }
+    } catch (error) {
+      console.error('Error loading workflow triggers:', error)
+    }
+  }
 
   const getActionIcon = useCallback((actionType: string) => {
     switch (actionType) {
@@ -588,6 +660,34 @@ export default function CreateWorkflowPage() {
   const handleBack = () => {
     setStep(step - 1)
   }
+  
+  // Trigger management functions
+  const handleAddTrigger = () => {
+    if (!newTriggerSourceId) return
+    
+    const sourceName = newTriggerType === 'form_submission' 
+      ? availableForms.find(f => f.id === newTriggerSourceId)?.name || 'Unknown Form'
+      : availableTables.find(t => t.id === newTriggerSourceId)?.name || 'Unknown Table'
+    
+    const config = newTriggerType === 'database_change' 
+      ? { operations: newTriggerOperations }
+      : {}
+    
+    setWorkflowTriggers([...workflowTriggers, {
+      type: newTriggerType,
+      sourceId: newTriggerSourceId,
+      sourceName,
+      config
+    }])
+    
+    setShowAddTrigger(false)
+    setNewTriggerSourceId(null)
+    setNewTriggerOperations(['create', 'update', 'delete'])
+  }
+  
+  const handleRemoveTrigger = (index: number) => {
+    setWorkflowTriggers(workflowTriggers.filter((_, i) => i !== index))
+  }
 
   const isNextDisabled = () => {
     if (step === 1) return !selectedTemplate
@@ -596,21 +696,127 @@ export default function CreateWorkflowPage() {
     return false
   }
 
-  const handleSaveWorkflow = async () => {
+  const handleSaveWorkflow = async (temporary = false) => {
     if (!workflowName || workflowSteps.length === 0) {
       toast({
         title: "Error",
         description: "El workflow debe tener un nombre y al menos un paso",
         variant: "destructive",
       })
-      return
+      return null
     }
 
     setIsSaving(true)
 
     try {
+      // Save workflow to database
+      const workflowPayload = {
+        user_id: 1, // TODO: Get from session
+        name: workflowName,
+        description: workflowDescription,
+        is_active: isActive,
+        configs: {
+          steps: workflowSteps.map((step) => ({
+            id: step.id.toString(),
+            type: step.type,
+            actionType: step.actionId,
+            name: step.name,
+            description: step.description,
+            config: step.config || {},
+            position: step.position,
+          })),
+          connections: connections.map((conn) => ({
+            from: conn.from.toString(),
+            to: conn.to.toString(),
+          })),
+        }
+      }
+      
+      let workflowId: number
+      let savedWorkflow: any
+      
+      // Determine if we're creating or updating
+      if (isEditMode && workflowData?.id) {
+        // EDIT MODE: Update existing workflow
+        console.log(`🔄 Updating existing workflow ID: ${workflowData.id}`)
+        workflowId = workflowData.id
+        
+        const workflowResponse = await fetch(`/api/workflows/${workflowId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workflowPayload)
+        })
+        
+        if (!workflowResponse.ok) {
+          throw new Error('Failed to update workflow')
+        }
+        
+        savedWorkflow = await workflowResponse.json()
+        
+        // Delete existing steps
+        await fetch(`/api/workflow-steps?workflow_id=${workflowId}`, {
+          method: 'DELETE'
+        })
+        
+        // Delete existing triggers
+        await fetch(`/api/workflow-triggers?workflow_id=${workflowId}`, {
+          method: 'DELETE'
+        })
+        
+      } else {
+        // CREATE MODE: Create new workflow
+        console.log(`✨ Creating new workflow`)
+        const workflowResponse = await fetch('/api/workflows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workflowPayload)
+        })
+        
+        if (!workflowResponse.ok) {
+          throw new Error('Failed to create workflow')
+        }
+        
+        savedWorkflow = await workflowResponse.json()
+        workflowId = Array.isArray(savedWorkflow) ? savedWorkflow[0].id : savedWorkflow.id
+      }
+      
+      // Save workflow steps to database (same for both create and update)
+      for (let i = 0; i < workflowSteps.length; i++) {
+        const step = workflowSteps[i]
+        await fetch('/api/workflow-steps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workflow_id: workflowId,
+            type: step.actionId,
+            position: i,
+            configs: step.config || {}
+          })
+        })
+      }
+      
+      // Save triggers (same for both create and update)
+      for (const trigger of workflowTriggers) {
+        await fetch('/api/workflow-triggers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workflow_id: workflowId,
+            trigger_type: trigger.type,
+            trigger_source_id: trigger.sourceId,
+            trigger_config: trigger.config || {}
+          })
+        })
+      }
+      
+      // If temporary save (for testing), return the workflow
+      if (temporary) {
+        return { id: workflowId, ...savedWorkflow }
+      }
+      
+      // Also save to localStorage for backward compatibility
       const workflow: Workflow = {
-        id: isEditMode ? workflowData.id : `workflow_${Date.now()}`,
+        id: workflowId.toString(),
         name: workflowName,
         description: workflowDescription,
         steps: workflowSteps.map((step) => ({
@@ -627,24 +833,30 @@ export default function CreateWorkflowPage() {
           to: conn.to.toString(),
         })),
         isActive,
-        createdAt: isEditMode ? workflowData.createdAt : new Date(),
+        createdAt: new Date(),
         updatedAt: new Date(),
       }
-
+      
       workflowEngine.saveWorkflow(workflow)
 
       toast({
-        title: "¡Éxito!",
-        description: `Workflow "${workflowName}" ${isEditMode ? 'actualizado' : 'creado'} exitosamente`,
+        title: isEditMode ? "✅ Workflow actualizado" : "✅ Workflow creado",
+        description: `El workflow "${workflowName}" se ha ${isEditMode ? 'actualizado' : 'guardado'} correctamente`,
       })
 
-      router.push("/dashboard/workflows")
+      setTimeout(() => {
+        router.push("/dashboard/workflows")
+      }, 1500)
+      
+      return { id: workflowId, ...savedWorkflow }
     } catch (error) {
+      console.error('Error saving workflow:', error)
       toast({
         title: "Error",
-        description: `No se pudo ${isEditMode ? 'actualizar' : 'crear'} el workflow`,
+        description: isEditMode ? "No se pudo actualizar el workflow" : "No se pudo crear el workflow",
         variant: "destructive",
       })
+      return null
     } finally {
       setIsSaving(false)
     }
@@ -661,35 +873,62 @@ export default function CreateWorkflowPage() {
     }
 
     try {
-      const testWorkflow: Workflow = {
-        id: `test_${Date.now()}`,
-        name: workflowName || "Test Workflow",
-        description: workflowDescription,
-        steps: workflowSteps.map((step) => ({
-          id: step.id.toString(),
-          type: step.type,
-          actionType: step.actionId,
-          name: step.name,
-          description: step.description,
-          config: step.config || {},
-          position: step.position,
-        })),
-        connections: connections.map((conn) => ({
-          from: conn.from.toString(),
-          to: conn.to.toString(),
-        })),
-        isActive: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      console.log('🧪 Testing workflow...')
+      
+      // If workflow is already saved (edit mode), use its ID
+      let workflowId = isEditMode && workflowData?.id ? workflowData.id : null
+      
+      // If not saved yet, do a temporary save
+      if (!workflowId) {
+        console.log('💾 Workflow not saved yet, saving temporarily for test...')
+        const tempWorkflow = await handleSaveWorkflow(true)
+        if (!tempWorkflow) {
+          throw new Error('Failed to save workflow for testing')
+        }
+        workflowId = tempWorkflow.id
       }
 
-      const execution = await workflowEngine.executeWorkflow(testWorkflow.id, { test: true })
+      console.log(`🚀 Executing workflow ${workflowId} with test data...`)
 
-      toast({
-        title: "Prueba completada",
-        description: `Workflow ejecutado con estado: ${execution.status}`,
+      // Execute the workflow with test data
+      const response = await fetch('/api/workflows/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflow_id: workflowId,
+          trigger_data: {
+            test: true,
+            name: 'Usuario de Prueba',
+            email: 'test@example.com',
+            mensaje: 'Este es un test del workflow',
+            phone: '555-1234',
+            company: 'Empresa de Prueba'
+          }
+        })
       })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        toast({
+          title: "✅ Prueba exitosa",
+          description: `Workflow ejecutado correctamente. Revisa los logs en la consola del servidor.`,
+        })
+        console.log('✅ Workflow execution successful!')
+        console.log('📋 Execution logs:', result.logs)
+      } else {
+        toast({
+          title: "❌ Prueba fallida",
+          description: result.error || "Error desconocido",
+          variant: "destructive"
+        })
+        console.error('❌ Workflow execution failed:', result.error)
+        if (result.logs) {
+          console.log('📋 Execution logs:', result.logs)
+        }
+      }
     } catch (error) {
+      console.error('❌ Test workflow error:', error)
       toast({
         title: "Error en la prueba",
         description: error instanceof Error ? error.message : "Error desconocido",
@@ -885,13 +1124,13 @@ export default function CreateWorkflowPage() {
 
     return (
       <Dialog open={showStepConfig !== null} onOpenChange={() => setShowStepConfig(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Configurar {step.name}</DialogTitle>
             <DialogDescription>Configura los detalles para este paso del flujo de trabajo</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 overflow-y-auto">
             {step.actionId === "send-email" && (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -1500,9 +1739,37 @@ export default function CreateWorkflowPage() {
 
       <main className="flex flex-1 flex-col p-6">
         <div className="mx-auto w-full max-w-5xl">
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-2xl font-bold">Crear Nuevo Flujo de Trabajo</h1>
             <p className="text-muted-foreground">Automatiza los procesos de tu negocio con unos simples pasos</p>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className="mb-6 flex justify-between items-center">
+            {step > 1 ? (
+              <Button variant="outline" onClick={handleBack}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Atrás
+              </Button>
+            ) : (
+              <Button variant="outline" asChild>
+                <Link href="/dashboard/workflows">Cancelar</Link>
+              </Button>
+            )}
+
+            <Button onClick={handleNext} disabled={isNextDisabled() || isSaving}>
+              {step === 3 ? (
+                <>
+                  {isSaving ? "Guardando..." : isEditMode ? "Actualizar Workflow" : "Crear Flujo de Trabajo"}
+                  <Save className="ml-2 h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  Siguiente
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
           </div>
 
           <div className="mb-8">
@@ -1637,6 +1904,59 @@ export default function CreateWorkflowPage() {
                       </Select>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Triggers / Desencadenantes</CardTitle>
+                  <CardDescription>
+                    Configura qué eventos activarán este workflow automáticamente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {workflowTriggers.length > 0 ? (
+                    <div className="space-y-2">
+                      {workflowTriggers.map((trigger, index) => (
+                        <div key={index} className="flex items-center justify-between rounded-lg border p-3">
+                          <div className="flex items-center gap-3">
+                            {trigger.type === 'form_submission' ? (
+                              <FileText className="h-5 w-5 text-primary" />
+                            ) : (
+                              <Database className="h-5 w-5 text-primary" />
+                            )}
+                            <div>
+                              <div className="font-medium">{trigger.sourceName}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {trigger.type === 'form_submission' 
+                                  ? 'Cuando se envía el formulario' 
+                                  : `Cambios en la base de datos (${trigger.config?.operations?.join(', ')})`}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveTrigger(index)}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed p-6 text-center">
+                      <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground mb-4">
+                        No hay triggers configurados. Añade un trigger para que este workflow se ejecute automáticamente.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <Button variant="outline" className="w-full" onClick={() => setShowAddTrigger(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Añadir Trigger
+                  </Button>
                 </CardContent>
               </Card>
 
@@ -1947,35 +2267,136 @@ export default function CreateWorkflowPage() {
               {renderStepConfig()}
             </div>
           )}
-
-          <div className="mt-8 flex justify-between">
-            {step > 1 ? (
-              <Button variant="outline" onClick={handleBack}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Atrás
-              </Button>
-            ) : (
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/workflows">Cancelar</Link>
-              </Button>
-            )}
-
-            <Button onClick={handleNext} disabled={isNextDisabled() || isSaving}>
-              {step === 3 ? (
-                <>
-                  {isSaving ? "Guardando..." : isEditMode ? "Actualizar Workflow" : "Crear Flujo de Trabajo"}
-                  <Save className="ml-2 h-4 w-4" />
-                </>
-              ) : (
-                <>
-                  Siguiente
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </div>
         </div>
       </main>
+      
+      {/* Add Trigger Dialog */}
+      <Dialog open={showAddTrigger} onOpenChange={setShowAddTrigger}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Añadir Trigger</DialogTitle>
+            <DialogDescription>
+              Selecciona qué evento activará este workflow automáticamente
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4 overflow-y-auto">
+            <div className="space-y-2">
+              <Label>Tipo de Trigger</Label>
+              <Select value={newTriggerType} onValueChange={(value: any) => setNewTriggerType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="form_submission">Envío de Formulario</SelectItem>
+                  <SelectItem value="database_change">Cambio en Base de Datos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {newTriggerType === 'form_submission' && (
+              <div className="space-y-2">
+                <Label>Seleccionar Formulario</Label>
+                <Select value={newTriggerSourceId?.toString()} onValueChange={(value) => setNewTriggerSourceId(parseInt(value))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un formulario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableForms.map((form) => (
+                      <SelectItem key={form.id} value={form.id.toString()}>
+                        {form.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            {newTriggerType === 'database_change' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Seleccionar Tabla</Label>
+                  <Select value={newTriggerSourceId?.toString()} onValueChange={(value) => setNewTriggerSourceId(parseInt(value))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una tabla" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTables.map((table) => (
+                        <SelectItem key={table.id} value={table.id.toString()}>
+                          {table.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Operaciones que activan el trigger</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="op-create"
+                        checked={newTriggerOperations.includes('create')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewTriggerOperations([...newTriggerOperations, 'create'])
+                          } else {
+                            setNewTriggerOperations(newTriggerOperations.filter(op => op !== 'create'))
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="op-create" className="font-normal">Crear registro</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="op-update"
+                        checked={newTriggerOperations.includes('update')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewTriggerOperations([...newTriggerOperations, 'update'])
+                          } else {
+                            setNewTriggerOperations(newTriggerOperations.filter(op => op !== 'update'))
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="op-update" className="font-normal">Actualizar registro</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="op-delete"
+                        checked={newTriggerOperations.includes('delete')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewTriggerOperations([...newTriggerOperations, 'delete'])
+                          } else {
+                            setNewTriggerOperations(newTriggerOperations.filter(op => op !== 'delete'))
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="op-delete" className="font-normal">Eliminar registro</Label>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddTrigger(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddTrigger} disabled={!newTriggerSourceId}>
+              Añadir Trigger
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

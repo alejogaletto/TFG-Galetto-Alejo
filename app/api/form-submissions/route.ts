@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-client';
+import { workflowTriggerService } from '@/lib/workflow-trigger-service';
 
 const supabase = createClient();
 
@@ -52,6 +53,28 @@ export async function POST(req: NextRequest) {
       }
     } catch (gsErr) {
       console.error('Google Sheets append failed:', gsErr)
+      // do not fail the main storage
+    }
+
+    // Trigger workflows associated with this form (best-effort, non-blocking)
+    try {
+      console.log(`\n🔔 [FormSubmission] Triggering workflows for form ${form_id}...`);
+      const triggerResult = await workflowTriggerService.executeFormSubmissionTriggers(
+        form_id,
+        form_data,
+        undefined // Submission ID - could be extracted from response if needed
+      );
+      console.log(`✅ [FormSubmission] Workflow trigger complete: ${triggerResult.triggered} workflow(s) triggered`);
+      if (triggerResult.results.length > 0) {
+        triggerResult.results.forEach((result) => {
+          console.log(`   - ${result.workflowName}: ${result.success ? '✅ Success' : '❌ Failed'}`);
+          if (result.error) {
+            console.log(`     Error: ${result.error}`);
+          }
+        });
+      }
+    } catch (workflowErr) {
+      console.error('❌ [FormSubmission] Workflow trigger execution failed:', workflowErr);
       // do not fail the main storage
     }
 

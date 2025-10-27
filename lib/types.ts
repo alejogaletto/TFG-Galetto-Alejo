@@ -98,6 +98,27 @@ export type WorkflowStep = {
   external_services?: any;
 };
 
+export type WorkflowTrigger = {
+  id: number;
+  workflow_id: number;
+  trigger_type: 'form_submission' | 'database_change';
+  trigger_source_id: number;
+  trigger_config?: any;
+  creation_date?: string;
+};
+
+export type WorkflowExecution = {
+  id: number;
+  workflow_id: number;
+  status: 'running' | 'completed' | 'failed';
+  trigger_type?: string;
+  trigger_data?: any;
+  execution_logs?: string[];
+  error_message?: string;
+  started_at?: string;
+  completed_at?: string;
+};
+
 export type Solution = {
   id: number;
   user_id?: number;
