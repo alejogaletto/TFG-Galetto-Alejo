@@ -80,32 +80,30 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      // Check Supabase Auth session
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      // Verificar si hay usuario logueado en localStorage
+      const userData = localStorage.getItem("user")
 
-      if (authError || !user) {
-        console.error("No user session:", authError)
+      if (!userData) {
         router.push("/login")
         return
       }
 
-      // Load user profile from User table
-      const { data: profileData, error: profileError } = await supabase
-        .from("User")
-        .select("*")
-        .eq("id", user.id)
-        .single()
+      const user = JSON.parse(userData)
 
+      // Cargar datos del perfil desde localStorage o crear perfil por defecto
+      const savedProfile = localStorage.getItem("userProfile")
       let userProfile: UserProfile
 
-      if (profileError || !profileData) {
-        // Create default profile based on auth user metadata
+      if (savedProfile) {
+        userProfile = JSON.parse(savedProfile)
+      } else {
+        // Crear perfil por defecto basado en datos de login
         userProfile = {
           id: user.id,
-          name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuario",
-          email: user.email || "",
-          company_name: user.user_metadata?.company_name || "",
-          creation_date: user.created_at || new Date().toISOString(),
+          name: user.name || user.email.split("@")[0] || "Usuario",
+          email: user.email,
+          company_name: "",
+          creation_date: new Date().toISOString(),
           configs: {
             notifications: {
               email: true,
@@ -120,28 +118,8 @@ export default function ProfilePage() {
             },
           },
         }
-      } else {
-        // Use profile data from database
-        userProfile = {
-          id: profileData.id,
-          name: profileData.name || user.user_metadata?.name || "Usuario",
-          email: profileData.email || user.email || "",
-          company_name: profileData.configs?.companyName || user.user_metadata?.company_name || "",
-          creation_date: profileData.creation_date || user.created_at,
-          configs: profileData.configs || {
-            notifications: {
-              email: true,
-              push: false,
-              marketing: false,
-            },
-            google: {
-              connected: false,
-              method: "oauth",
-              clientEmail: "",
-              projectId: "",
-            },
-          },
-        }
+        // Guardar perfil por defecto
+        localStorage.setItem("userProfile", JSON.stringify(userProfile))
       }
 
       setProfile(userProfile)
@@ -183,28 +161,19 @@ export default function ProfilePage() {
           ...profile.configs,
           notifications,
           google: googleConfig,
-          companyName,
         },
       }
 
-      // Update in User table
-      const { error } = await supabase
-        .from("User")
-        .update({
-          name,
-          configs: updatedProfile.configs,
-        })
-        .eq("id", profile.id)
+      // Guardar en localStorage
+      localStorage.setItem("userProfile", JSON.stringify(updatedProfile))
 
-      if (error) throw error
-
-      // Also update Supabase Auth user metadata
-      await supabase.auth.updateUser({
-        data: {
-          name,
-          company_name: companyName,
-        },
-      })
+      // Actualizar también los datos básicos del usuario
+      const userData = localStorage.getItem("user")
+      if (userData) {
+        const user = JSON.parse(userData)
+        user.name = name
+        localStorage.setItem("user", JSON.stringify(user))
+      }
 
       setProfile(updatedProfile)
 
