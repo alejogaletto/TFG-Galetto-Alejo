@@ -48,23 +48,189 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
 import { WorkflowEngine, Workflow as WorkflowType } from "@/lib/workflow-engine"
 
 export default function WorkflowsPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [workflows, setWorkflows] = useState<WorkflowType[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null)
 
-  // Initialize workflow engine and load workflows
+  // Load workflows from database
   useEffect(() => {
-    const workflowEngine = WorkflowEngine.getInstance()
-    workflowEngine.loadWorkflows()
-    const loadedWorkflows = workflowEngine.getAllWorkflows()
-    setWorkflows(loadedWorkflows)
-    setIsLoading(false)
+    const loadWorkflows = async () => {
+      try {
+        const response = await fetch('/api/workflows')
+        if (response.ok) {
+          const data = await response.json()
+          // Convert database format to UI format
+          const uiWorkflows = data.map((workflow: any) => ({
+            id: workflow.id.toString(),
+            name: workflow.name,
+            description: workflow.description || '',
+            isActive: workflow.is_active ?? true,
+            steps: [],
+            connections: [],
+            createdAt: new Date(workflow.creation_date),
+            updatedAt: new Date(workflow.creation_date)
+          }))
+          setWorkflows(uiWorkflows)
+        }
+      } catch (error) {
+        console.error('Error loading workflows:', error)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los workflows",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadWorkflows()
   }, [])
+
+  // Show delete confirmation dialog
+  const showDeleteConfirmation = (e: React.MouseEvent, workflowId: string) => {
+    e.stopPropagation()
+    setWorkflowToDelete(workflowId)
+  }
+
+  // Handle delete workflow
+  const handleDeleteWorkflow = async () => {
+    if (!workflowToDelete) return
+
+    try {
+      // Delete from database
+      const response = await fetch(`/api/workflows/${workflowToDelete}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete workflow')
+      }
+
+      // Delete from localStorage (for backward compatibility)
+      try {
+        const workflowEngine = WorkflowEngine.getInstance()
+        workflowEngine.deleteWorkflow(workflowToDelete)
+      } catch (err) {
+        // Ignore localStorage errors
+      }
+
+      // Refresh workflows list from database
+      const refreshResponse = await fetch('/api/workflows')
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json()
+        const uiWorkflows = data.map((workflow: any) => ({
+          id: workflow.id.toString(),
+          name: workflow.name,
+          description: workflow.description || '',
+          isActive: workflow.is_active ?? true,
+          steps: [],
+          connections: [],
+          createdAt: new Date(workflow.creation_date),
+          updatedAt: new Date(workflow.creation_date)
+        }))
+        setWorkflows(uiWorkflows)
+      }
+
+      toast({
+        title: "✅ Workflow eliminado",
+        description: "El workflow se ha eliminado correctamente"
+      })
+
+      console.log(`✅ Workflow ${workflowToDelete} deleted successfully`)
+    } catch (error) {
+      console.error('Error deleting workflow:', error)
+      toast({
+        title: "❌ Error",
+        description: "No se pudo eliminar el workflow",
+        variant: "destructive"
+      })
+    } finally {
+      setWorkflowToDelete(null)
+    }
+  }
+
+  // Handle toggle workflow active status
+  const handleToggleActive = async (e: React.MouseEvent, workflow: WorkflowType) => {
+    e.stopPropagation()
+    
+    try {
+      const newStatus = !workflow.isActive
+
+      // Update in database
+      const response = await fetch(`/api/workflows/${workflow.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...workflow,
+          is_active: newStatus,
+          isActive: newStatus
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update workflow')
+      }
+
+      // Update in localStorage (for backward compatibility)
+      try {
+        const workflowEngine = WorkflowEngine.getInstance()
+        const updatedWorkflow = { ...workflow, isActive: newStatus }
+        workflowEngine.saveWorkflow(updatedWorkflow)
+      } catch (err) {
+        // Ignore localStorage errors
+      }
+
+      // Refresh workflows list from database
+      const refreshResponse = await fetch('/api/workflows')
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json()
+        const uiWorkflows = data.map((w: any) => ({
+          id: w.id.toString(),
+          name: w.name,
+          description: w.description || '',
+          isActive: w.is_active ?? true,
+          steps: [],
+          connections: [],
+          createdAt: new Date(w.creation_date),
+          updatedAt: new Date(w.creation_date)
+        }))
+        setWorkflows(uiWorkflows)
+      }
+
+      toast({
+        title: newStatus ? "✅ Workflow activado" : "⏸️ Workflow pausado",
+        description: `El workflow se ha ${newStatus ? 'activado' : 'pausado'} correctamente`
+      })
+
+      console.log(`✅ Workflow ${workflow.id} ${newStatus ? 'activated' : 'deactivated'}`)
+    } catch (error) {
+      console.error('Error toggling workflow:', error)
+      toast({
+        title: "❌ Error",
+        description: "No se pudo actualizar el estado del workflow",
+        variant: "destructive"
+      })
+    }
+  }
 
 
   // Mock data for integrations
@@ -411,20 +577,32 @@ export default function WorkflowsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/dashboard/workflows/${workflow.id}`)
+                              }}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver Detalles
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/dashboard/workflows/${workflow.id}/edit`)
+                              }}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation()
+                                toast({
+                                  title: "Próximamente",
+                                  description: "La función de duplicar estará disponible pronto"
+                                })
+                              }}>
                                 <Copy className="mr-2 h-4 w-4" />
                                 Duplicar
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => handleToggleActive(e, workflow)}>
                                 {workflow.isActive ? (
                                   <>
                                     <Pause className="mr-2 h-4 w-4" />
@@ -437,7 +615,10 @@ export default function WorkflowsPage() {
                                   </>
                                 )}
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={(e) => showDeleteConfirmation(e, workflow.id)}
+                              >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Eliminar
                               </DropdownMenuItem>
@@ -607,6 +788,27 @@ export default function WorkflowsPage() {
           </Tabs>
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={workflowToDelete !== null} onOpenChange={() => setWorkflowToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro de eliminar este workflow?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El workflow y todos sus pasos serán eliminados permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteWorkflow}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

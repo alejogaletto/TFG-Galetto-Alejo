@@ -56,11 +56,13 @@ export default function CreateWorkflowPage() {
   
   // Check if we're in edit mode
   const isEditMode = searchParams.get('edit') === 'true'
-  const workflowData = isEditMode ? JSON.parse(decodeURIComponent(searchParams.get('workflow') || '{}')) : null
+  const workflowId = searchParams.get('id') // Get workflow ID from URL
   
-  const [step, setStep] = useState(isEditMode ? 3 : 1) // Start at step 3 (canvas) if editing
-  const [workflowName, setWorkflowName] = useState(workflowData?.name || "")
-  const [workflowDescription, setWorkflowDescription] = useState(workflowData?.description || "")
+  const [workflowData, setWorkflowData] = useState<any>(null)
+  const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(isEditMode) // Loading state for edit mode
+  const [step, setStep] = useState(isEditMode ? 3 : 1) // Start at step 3 if editing
+  const [workflowName, setWorkflowName] = useState("")
+  const [workflowDescription, setWorkflowDescription] = useState("")
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null)
   const [workflowSteps, setWorkflowSteps] = useState<any[]>([])
@@ -70,7 +72,7 @@ export default function CreateWorkflowPage() {
   const [lineStart, setLineStart] = useState<{ x: number; y: number } | null>(null)
   const [lineEnd, setLineEnd] = useState<{ x: number; y: number } | null>(null)
   const [connections, setConnections] = useState<{ from: number; to: number }[]>([])
-  const [isActive, setIsActive] = useState(workflowData?.isActive ?? true)
+  const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
@@ -92,6 +94,64 @@ export default function CreateWorkflowPage() {
 
   const workflowEngine = WorkflowEngine.getInstance()
   const integrationsEngine = IntegrationsEngine.getInstance()
+
+  // Load workflow data from API if in edit mode
+  useEffect(() => {
+    const loadWorkflowData = async () => {
+      if (isEditMode && workflowId) {
+        setIsLoadingWorkflow(true)
+        try {
+          console.log(`📖 Loading workflow ${workflowId} from API...`)
+          const response = await fetch(`/api/workflows/${workflowId}?includeSteps=true`)
+          
+          if (!response.ok) {
+            throw new Error('Failed to load workflow')
+          }
+          
+          const workflow = await response.json()
+          const steps = workflow.steps || []
+          
+          // Convert database format to UI format
+          const uiWorkflowData = {
+            id: workflow.id,
+            name: workflow.name || '',
+            description: workflow.description || '',
+            isActive: workflow.is_active ?? true,
+            steps: steps.map((step: any, index: number) => ({
+              id: step.id,
+              type: step.type,
+              actionId: step.type,
+              name: step.type.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+              description: '',
+              config: step.configs || {},
+              position: { x: 50, y: 50 + (index * 130) }
+            })),
+            connections: [],
+            createdAt: workflow.creation_date,
+            updatedAt: workflow.creation_date
+          }
+          
+          console.log(`✅ Workflow loaded:`, uiWorkflowData)
+          setWorkflowData(uiWorkflowData)
+          setWorkflowName(uiWorkflowData.name)
+          setWorkflowDescription(uiWorkflowData.description)
+          setIsActive(uiWorkflowData.isActive)
+        } catch (error) {
+          console.error('❌ Error loading workflow:', error)
+          toast({
+            title: "Error",
+            description: "No se pudo cargar el workflow",
+            variant: "destructive"
+          })
+          router.push('/dashboard/workflows')
+        } finally {
+          setIsLoadingWorkflow(false)
+        }
+      }
+    }
+    
+    loadWorkflowData()
+  }, [isEditMode, workflowId, router, toast])
 
   useEffect(() => {
     workflowEngine.loadWorkflows()
@@ -128,28 +188,25 @@ export default function CreateWorkflowPage() {
     }
   }, [availableForms, availableTables, isEditMode, workflowData?.id])
 
-  // Load workflow data when in edit mode
+  // Load workflow steps into canvas when workflow data is loaded
   useEffect(() => {
-    if (isEditMode && workflowData) {
+    if (isEditMode && workflowData && workflowData.steps) {
       // Convert workflow steps to canvas format
       const canvasSteps = workflowData.steps.map((step: any, index: number) => ({
         id: step.id,
         type: step.type,
-        actionId: step.actionType,
+        actionId: step.actionId || step.type,
         name: step.name,
         description: step.description,
-        icon: getActionIcon(step.actionType),
+        icon: getActionIcon(step.actionId || step.type),
         position: step.position || { x: 50, y: 50 + (index * 130) },
         config: step.config,
       }))
       
       setWorkflowSteps(canvasSteps)
-      setConnections(workflowData.connections.map((conn: any) => ({
-        from: parseInt(conn.from),
-        to: parseInt(conn.to)
-      })))
+      setConnections(workflowData.connections || [])
     }
-  }, [isEditMode, workflowData?.id]) // Only depend on workflow ID, not the entire workflowData object
+  }, [workflowData]) // Trigger when workflowData is loaded
   
   // Load triggers for a workflow
   const loadWorkflowTriggers = async (workflowId: number) => {
@@ -1692,6 +1749,18 @@ export default function CreateWorkflowPage() {
     {} as Record<string, typeof actions>,
   )
 
+  // Show loading state while fetching workflow data
+  if (isLoadingWorkflow) {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-lg text-muted-foreground">Cargando workflow...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
@@ -1740,7 +1809,7 @@ export default function CreateWorkflowPage() {
       <main className="flex flex-1 flex-col p-6">
         <div className="mx-auto w-full max-w-5xl">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold">Crear Nuevo Flujo de Trabajo</h1>
+            <h1 className="text-2xl font-bold">{isEditMode ? "Editar Flujo de Trabajo" : "Crear Nuevo Flujo de Trabajo"}</h1>
             <p className="text-muted-foreground">Automatiza los procesos de tu negocio con unos simples pasos</p>
           </div>
 
