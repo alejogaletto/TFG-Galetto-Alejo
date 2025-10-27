@@ -4,13 +4,14 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase-client"
+import { createBrowserClient } from "@/lib/supabase-client"
+import { validatePassword, getPasswordRequirements } from "@/lib/password"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2, Check, X } from "lucide-react"
 
 export default function UpdatePassword() {
   const [password, setPassword] = useState("")
@@ -18,8 +19,12 @@ export default function UpdatePassword() {
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [isValidToken, setIsValidToken] = useState(true)
+  const [passwordFocused, setPasswordFocused] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
+
+  const passwordReqs = getPasswordRequirements(password)
+  const showPasswordHints = passwordFocused || password.length > 0
 
   useEffect(() => {
     // Verificar que el usuario llegó aquí con un token válido
@@ -51,11 +56,12 @@ export default function UpdatePassword() {
       return
     }
 
-    // Validar longitud mínima
-    if (password.length < 8) {
+    // Validar política de contraseñas
+    const validation = validatePassword(password)
+    if (!validation.isValid) {
       setMessage({
         type: "error",
-        text: "La contraseña debe tener al menos 8 caracteres.",
+        text: validation.errors[0],
       })
       return
     }
@@ -141,9 +147,22 @@ export default function UpdatePassword() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
                 required
                 minLength={8}
               />
+              {showPasswordHints && (
+                <div className="space-y-1 pt-2">
+                  <p className="text-xs font-medium text-muted-foreground">Requisitos de contraseña:</p>
+                  <div className="space-y-1">
+                    <PasswordRequirement met={passwordReqs.minLength} text="Mínimo 8 caracteres" />
+                    <PasswordRequirement met={passwordReqs.hasUppercase} text="Una letra mayúscula" />
+                    <PasswordRequirement met={passwordReqs.hasNumber} text="Un número" />
+                    <PasswordRequirement met={passwordReqs.hasSymbol} text="Un símbolo especial" />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
@@ -171,6 +190,19 @@ export default function UpdatePassword() {
           </CardFooter>
         </form>
       </Card>
+    </div>
+  )
+}
+
+function PasswordRequirement({ met, text }: { met: boolean; text: string }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      {met ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <X className="h-3 w-3 text-muted-foreground" />
+      )}
+      <span className={met ? "text-green-600" : "text-muted-foreground"}>{text}</span>
     </div>
   )
 }

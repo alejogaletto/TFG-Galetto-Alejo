@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import { createBrowserClient } from "@/lib/supabase-client"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const supabase = createBrowserClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,6 +33,7 @@ export default function LoginPage() {
           description: "Por favor completa todos los campos",
           variant: "destructive",
         })
+        setIsLoading(false)
         return
       }
 
@@ -40,34 +43,36 @@ export default function LoginPage() {
           description: "Por favor ingresa un email válido",
           variant: "destructive",
         })
+        setIsLoading(false)
         return
       }
 
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      // Sign in with Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       })
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}))
-        throw new Error(body?.error || "Email o contraseña incorrectos")
+      if (error) {
+        throw error
       }
 
-      const { user } = await response.json()
+      if (!data.user) {
+        throw new Error("No se pudo iniciar sesión")
+      }
 
       toast({
         title: "¡Bienvenido!",
         description: "Has iniciado sesión correctamente",
       })
 
-      localStorage.setItem("user", JSON.stringify(user))
-
       router.push("/dashboard")
-    } catch (error) {
+      router.refresh()
+    } catch (error: any) {
+      console.error("Login error:", error)
       toast({
         title: "Error",
-        description: "Ocurrió un error al iniciar sesión",
+        description: error?.message || "Email o contraseña incorrectos",
         variant: "destructive",
       })
     } finally {
@@ -78,12 +83,20 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setIsLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      toast({
-        title: "Google Login",
-        description: "Funcionalidad próximamente disponible",
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       })
-    } finally {
+
+      if (error) throw error
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo conectar con Google",
+        variant: "destructive",
+      })
       setIsLoading(false)
     }
   }
@@ -91,12 +104,20 @@ export default function LoginPage() {
   const handleAppleLogin = async () => {
     setIsLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      toast({
-        title: "Apple Login",
-        description: "Funcionalidad próximamente disponible",
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       })
-    } finally {
+
+      if (error) throw error
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo conectar con Apple",
+        variant: "destructive",
+      })
       setIsLoading(false)
     }
   }
