@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-client';
 import { emailService } from '@/lib/email-service';
+import { notificationService } from '@/lib/notification-service';
 
 const supabase = createClient();
 
@@ -123,6 +124,26 @@ export class WorkflowExecutionService {
         .eq('id', executionId);
 
       logs.push('Workflow completed successfully');
+
+      // Create notification for workflow completion (best-effort, non-blocking)
+      try {
+        if (workflow.user_id) {
+          await notificationService.createNotification({
+            userId: workflow.user_id.toString(),
+            type: 'workflow_completed',
+            title: 'Workflow completado',
+            message: `El workflow "${workflow.name || 'Sin nombre'}" se ejecutó exitosamente`,
+            metadata: {
+              workflow_id: workflowId,
+              workflow_name: workflow.name,
+              execution_id: executionId
+            }
+          });
+        }
+      } catch (notifErr) {
+        console.error('Failed to create workflow completion notification:', notifErr);
+        // do not fail the workflow
+      }
 
       return {
         success: true,

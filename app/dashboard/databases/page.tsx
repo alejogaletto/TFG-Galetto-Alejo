@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { NotificationIcon } from "@/components/notifications/notification-icon"
 
 interface VirtualSchema {
   id: number
@@ -116,6 +117,9 @@ export default function DatabasesPage() {
               Soluciones
             </Link>
           </nav>
+          <div className="ml-auto">
+            <NotificationIcon />
+          </div>
         </header>
         <div className="flex flex-1">
           <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">
@@ -201,6 +205,9 @@ export default function DatabasesPage() {
               Soluciones
             </Link>
           </nav>
+          <div className="ml-auto">
+            <NotificationIcon />
+          </div>
         </header>
         <div className="flex flex-1">
           <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">
@@ -285,6 +292,9 @@ export default function DatabasesPage() {
             Soluciones
           </Link>
         </nav>
+        <div className="ml-auto">
+          <NotificationIcon />
+        </div>
       </header>
       <div className="flex flex-1">
         <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">

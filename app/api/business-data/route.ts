@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRLSClient } from '@/lib/supabase-client';
 import { BusinessData } from '@/lib/types';
 import { workflowTriggerService } from '@/lib/workflow-trigger-service';
+import { notificationService } from '@/lib/notification-service';
 
 // Create a new business data
 export async function POST(req: NextRequest) {
@@ -34,6 +35,31 @@ export async function POST(req: NextRequest) {
       );
     } catch (workflowErr) {
       console.error('Workflow trigger execution failed:', workflowErr);
+      // do not fail the main operation
+    }
+
+    // Create notification for registry creation (best-effort, non-blocking)
+    try {
+      // Get table name for better notification message
+      const { data: tableData } = await supabase
+        .from('VirtualTableSchema')
+        .select('name')
+        .eq('id', virtual_table_schema_id)
+        .single();
+
+      await notificationService.createNotification({
+        userId: user.id,
+        type: 'registry_created',
+        title: 'Nuevo registro creado',
+        message: `Se ha creado un nuevo registro en la tabla "${tableData?.name || 'Base de datos'}"`,
+        metadata: {
+          virtual_table_schema_id,
+          table_name: tableData?.name,
+          record_id: data[0].id
+        }
+      });
+    } catch (notifErr) {
+      console.error('Failed to create notification:', notifErr);
       // do not fail the main operation
     }
   }

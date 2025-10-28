@@ -144,3 +144,23 @@ export type SolutionComponent = {
   configs?: any;
   creation_date?: string;
 };
+
+export type NotificationType = 
+  | 'form_submission' 
+  | 'registry_created' 
+  | 'workflow_completed' 
+  | 'solution_deployed' 
+  | 'form_created' 
+  | 'database_created';
+
+export type Notification = {
+  id: number;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  message?: string;
+  metadata?: any;
+  is_read: boolean;
+  created_at: string;
+  read_at?: string;
+};

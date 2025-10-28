@@ -52,6 +52,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { NotificationIcon } from "@/components/notifications/notification-icon"
 
 export default function SolutionsPage() {
   const router = useRouter()
@@ -219,6 +220,7 @@ export default function SolutionsPage() {
           </Link>
         </nav>
         <div className="ml-auto flex items-center gap-4">
+          <NotificationIcon />
           <Button variant="outline" size="sm">
             <Settings className="mr-2 h-4 w-4" />
             Configuración

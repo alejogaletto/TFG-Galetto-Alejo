@@ -4,6 +4,7 @@ import { BarChart3, Database, FileText, Home, Plus, Settings, Workflow, Package 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { NotificationIcon } from "@/components/notifications/notification-icon"
 
 export default function DashboardPage() {
   return (
@@ -27,6 +28,7 @@ export default function DashboardPage() {
           </Link>
         </nav>
         <div className="ml-auto flex items-center gap-4">
+          <NotificationIcon />
           <Button variant="outline" size="sm">
             <Settings className="mr-2 h-4 w-4" />
             Configuración

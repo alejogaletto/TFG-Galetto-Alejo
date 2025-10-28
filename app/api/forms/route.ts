@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRLSClient } from '@/lib/supabase-client';
 import { Form } from '@/lib/types';
+import { notificationService } from '@/lib/notification-service';
 
 // Create a new form
 export async function POST(req: NextRequest) {
@@ -21,6 +22,26 @@ export async function POST(req: NextRequest) {
     .select();
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Create notification for form creation (best-effort, non-blocking)
+  if (data && data.length > 0) {
+    try {
+      await notificationService.createNotification({
+        userId: user.id,
+        type: 'form_created',
+        title: 'Nuevo formulario creado',
+        message: `Se ha creado el formulario "${name || 'Sin nombre'}"`,
+        metadata: {
+          form_id: data[0].id,
+          form_name: name
+        }
+      });
+    } catch (notifErr) {
+      console.error('Failed to create form notification:', notifErr);
+      // do not fail the main operation
+    }
+  }
+  
   return NextResponse.json(data, { status: 201 });
 }
 

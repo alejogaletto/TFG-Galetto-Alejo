@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-client';
 import { getServerUserId } from '@/lib/auth-helpers';
 import { workflowTriggerService } from '@/lib/workflow-trigger-service';
+import { notificationService } from '@/lib/notification-service';
 
 const supabase = createClient();
 
@@ -76,6 +77,26 @@ export async function POST(req: NextRequest) {
       }
     } catch (workflowErr) {
       console.error('❌ [FormSubmission] Workflow trigger execution failed:', workflowErr);
+      // do not fail the main storage
+    }
+
+    // Create notification for form submission (best-effort, non-blocking)
+    try {
+      if (form.user_id) {
+        await notificationService.createNotification({
+          userId: form.user_id.toString(),
+          type: 'form_submission',
+          title: 'Nuevo envío de formulario',
+          message: `Se ha recibido un nuevo envío del formulario "${form.name || 'Sin nombre'}"`,
+          metadata: {
+            form_id: form.id,
+            form_name: form.name,
+            submission_time: new Date().toISOString()
+          }
+        });
+      }
+    } catch (notifErr) {
+      console.error('Failed to create notification:', notifErr);
       // do not fail the main storage
     }
 

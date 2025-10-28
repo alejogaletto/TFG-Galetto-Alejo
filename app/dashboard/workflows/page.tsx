@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { WorkflowEngine, Workflow as WorkflowType } from "@/lib/workflow-engine"
+import { NotificationIcon } from "@/components/notifications/notification-icon"
 
 export default function WorkflowsPage() {
   const router = useRouter()
@@ -426,6 +427,9 @@ export default function WorkflowsPage() {
             Soluciones
           </Link>
         </nav>
+        <div className="ml-auto">
+          <NotificationIcon />
+        </div>
       </header>
 
       <div className="flex flex-1">

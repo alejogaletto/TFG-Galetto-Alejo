@@ -52,6 +52,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Form as FormType } from "@/lib/types"
+import { NotificationIcon } from "@/components/notifications/notification-icon"
 
 export default function FormsPage() {
   const router = useRouter()
@@ -274,6 +275,9 @@ export default function FormsPage() {
             Soluciones
           </Link>
         </nav>
+        <div className="ml-auto">
+          <NotificationIcon />
+        </div>
       </header>
       <div className="flex flex-1">
         <aside className="hidden w-[220px] flex-col border-r bg-muted/40 md:flex">

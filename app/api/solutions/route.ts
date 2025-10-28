@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRLSClient } from '@/lib/supabase-client';
 import { Solution } from '@/lib/types';
+import { notificationService } from '@/lib/notification-service';
 
 // Create a new solution
 export async function POST(req: NextRequest) {
@@ -52,6 +53,24 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('Error creating solution:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Create notification for solution creation (best-effort, non-blocking)
+    try {
+      await notificationService.createNotification({
+        userId: user.id,
+        type: 'solution_deployed',
+        title: 'Nueva solución creada',
+        message: `Se ha creado la solución "${name}"`,
+        metadata: {
+          solution_id: data[0].id,
+          solution_name: name,
+          template_type: template_type
+        }
+      });
+    } catch (notifErr) {
+      console.error('Failed to create solution notification:', notifErr);
+      // do not fail the main operation
     }
 
     return NextResponse.json(data[0], { status: 201 });

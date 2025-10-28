@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRLSClient } from '@/lib/supabase-client';
 import { VirtualSchema } from '@/lib/types';
+import { notificationService } from '@/lib/notification-service';
 
 // Create a new virtual schema
 export async function POST(req: NextRequest) {
@@ -22,6 +23,24 @@ export async function POST(req: NextRequest) {
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) return NextResponse.json({ error: 'Failed to create virtual schema' }, { status: 500 });
+
+  // Create notification for database creation (best-effort, non-blocking)
+  try {
+    await notificationService.createNotification({
+      userId: user.id,
+      type: 'database_created',
+      title: 'Nueva base de datos creada',
+      message: `Se ha creado la base de datos "${name || 'Sin nombre'}"`,
+      metadata: {
+        virtual_schema_id: data[0].id,
+        schema_name: name
+      }
+    });
+  } catch (notifErr) {
+    console.error('Failed to create database notification:', notifErr);
+    // do not fail the main operation
+  }
+
   return NextResponse.json(data[0], { status: 201 });
 }
 
