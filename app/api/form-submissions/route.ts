@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-client';
+import { getServerUserId } from '@/lib/auth-helpers';
 import { workflowTriggerService } from '@/lib/workflow-trigger-service';
 
 const supabase = createClient();
@@ -86,14 +87,31 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Get form submissions
+// Get form submissions for forms owned by the current user
 export async function GET(req: NextRequest) {
+  const userId = await getServerUserId();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const form_id = searchParams.get('form_id');
 
   try {
     if (form_id) {
-      // Get submissions for a specific form
+      // First, verify the user owns this form
+      const { data: form, error: formError } = await supabase
+        .from('Form')
+        .select('id')
+        .eq('id', form_id)
+        .eq('user_id', userId)
+        .single();
+
+      if (formError || !form) {
+        return NextResponse.json({ error: 'Form not found or access denied' }, { status: 404 });
+      }
+
+      // Get submissions for this specific form
       const { data, error } = await supabase
         .from('FormSubmission')
         .select('*')
@@ -103,10 +121,25 @@ export async function GET(req: NextRequest) {
       if (error) throw error;
       return NextResponse.json(data);
     } else {
-      // Get all submissions
+      // Get all submissions for forms owned by the user
+      // Need to join with Form table to filter by user_id
+      const { data: userForms, error: formsError } = await supabase
+        .from('Form')
+        .select('id')
+        .eq('user_id', userId);
+
+      if (formsError) throw formsError;
+
+      const formIds = userForms?.map(f => f.id) || [];
+
+      if (formIds.length === 0) {
+        return NextResponse.json([]);
+      }
+
       const { data, error } = await supabase
         .from('FormSubmission')
         .select('*')
+        .in('form_id', formIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -197,11 +230,23 @@ async function storeInBusinessData(form_id: number, form_data: any, virtual_tabl
 
     console.log('💾 Final mapped data to store:', mappedData);
 
-    // Store in BusinessData
+    // Get the form owner's user_id
+    const { data: formData, error: formFetchError } = await supabase
+      .from('Form')
+      .select('user_id')
+      .eq('id', form_id)
+      .single();
+
+    if (formFetchError || !formData) {
+      console.error('❌ Error fetching form owner:', formFetchError);
+      return await storeInFormSubmission(form_id, form_data);
+    }
+
+    // Store in BusinessData with the form owner's user_id
     const { data, error } = await supabase
       .from('BusinessData')
       .insert([{
-        user_id: 1, // TODO: Get from session
+        user_id: formData.user_id,
         virtual_table_schema_id: actualTableId,
         data_json: mappedData
       }])

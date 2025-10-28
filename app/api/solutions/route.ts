@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-client';
+import { getServerUserId } from '@/lib/auth-helpers';
 import { Solution } from '@/lib/types';
 
 const supabase = createClient();
@@ -7,9 +8,13 @@ const supabase = createClient();
 // Create a new solution
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as Solution;
+    const userId = await getServerUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json() as Partial<Solution>;
     const { 
-      user_id, 
       name, 
       description, 
       template_type, 
@@ -27,10 +32,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
+    // Always use the authenticated user's ID
     const { data, error } = await supabase
       .from('Solution')
       .insert([{ 
-        user_id, 
+        user_id: userId, 
         name, 
         description, 
         template_type, 
@@ -56,21 +62,26 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Get all solutions
+// Get all solutions for the current user
 export async function GET(req: NextRequest) {
   try {
+    const userId = await getServerUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
-    const user_id = searchParams.get('user_id');
     const is_template = searchParams.get('is_template');
     const template_type = searchParams.get('template_type');
     const includeComponents = searchParams.get('includeComponents') === 'true';
 
-    let query = supabase.from('Solution').select('*');
+    // Always filter by authenticated user's ID
+    let query = supabase
+      .from('Solution')
+      .select('*')
+      .eq('user_id', userId);
 
-    // Apply filters
-    if (user_id) {
-      query = query.eq('user_id', user_id);
-    }
+    // Apply additional filters
     if (is_template !== null) {
       query = query.eq('is_template', is_template === 'true');
     }
