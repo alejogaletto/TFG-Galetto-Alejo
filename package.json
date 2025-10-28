@@ -46,6 +46,7 @@
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
+    "@supabase/ssr": "latest",
     "@supabase/supabase-js": "^2.39.3",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
