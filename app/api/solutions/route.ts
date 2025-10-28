@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-client';
-import { getServerUserId } from '@/lib/auth-helpers';
+import { createRLSClient } from '@/lib/supabase-client';
 import { Solution } from '@/lib/types';
-
-const supabase = createClient();
 
 // Create a new solution
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getServerUserId();
-    if (!userId) {
+    const supabase = await createRLSClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,11 +31,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    // Always use the authenticated user's ID
+    // RLS policy will verify user_id matches auth.uid()
     const { data, error } = await supabase
       .from('Solution')
       .insert([{ 
-        user_id: userId, 
+        user_id: user.id, 
         name, 
         description, 
         template_type, 
@@ -62,24 +61,20 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Get all solutions for the current user
+// Get all solutions for the current user (RLS auto-filters)
 export async function GET(req: NextRequest) {
   try {
-    const userId = await getServerUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const supabase = await createRLSClient();
 
     const { searchParams } = new URL(req.url);
     const is_template = searchParams.get('is_template');
     const template_type = searchParams.get('template_type');
     const includeComponents = searchParams.get('includeComponents') === 'true';
 
-    // Always filter by authenticated user's ID
+    // No manual filtering - RLS handles it automatically
     let query = supabase
       .from('Solution')
-      .select('*')
-      .eq('user_id', userId);
+      .select('*');
 
     // Apply additional filters
     if (is_template !== null) {

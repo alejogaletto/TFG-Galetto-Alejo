@@ -1,25 +1,24 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-client';
-import { getServerUserId } from '@/lib/auth-helpers';
+import { createRLSClient } from '@/lib/supabase-client';
 import { BusinessData } from '@/lib/types';
 import { workflowTriggerService } from '@/lib/workflow-trigger-service';
 
-const supabase = createClient();
-
 // Create a new business data
 export async function POST(req: NextRequest) {
-  const userId = await getServerUserId();
-  if (!userId) {
+  const supabase = await createRLSClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { virtual_table_schema_id, data_json } = await req.json() as Partial<BusinessData>;
   
-  // Always use the authenticated user's ID
+  // RLS policy will verify user_id matches auth.uid()
   const { data, error } = await supabase
     .from('BusinessData')
-    .insert([{ user_id: userId, virtual_table_schema_id, data_json }])
+    .insert([{ user_id: user.id, virtual_table_schema_id, data_json }])
     .select();
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -42,21 +41,17 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data, { status: 201 });
 }
 
-// Get all business data for the current user (with optional filtering)
+// Get all business data for the current user (RLS auto-filters)
 export async function GET(req: NextRequest) {
-  const userId = await getServerUserId();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const supabase = await createRLSClient();
 
   const { searchParams } = new URL(req.url);
   const tableId = searchParams.get('virtual_table_schema_id');
   
-  // Always filter by authenticated user's ID
+  // No manual filtering - RLS handles it automatically
   let query = supabase
     .from('BusinessData')
-    .select('*')
-    .eq('user_id', userId);
+    .select('*');
   
   if (tableId) {
     query = query.eq('virtual_table_schema_id', Number(tableId));

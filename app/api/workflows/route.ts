@@ -1,46 +1,41 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-client';
-import { getServerUserId } from '@/lib/auth-helpers';
+import { createRLSClient } from '@/lib/supabase-client';
 import { Workflow } from '@/lib/types';
-
-const supabase = createClient();
 
 // Create a new workflow
 export async function POST(req: NextRequest) {
-  const userId = await getServerUserId();
-  if (!userId) {
+  const supabase = await createRLSClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { name, description, configs, is_active } = await req.json() as Partial<Workflow>;
   
-  // Always use the authenticated user's ID
+  // RLS policy will verify user_id matches auth.uid()
   const { data, error } = await supabase
     .from('Workflow')
-    .insert([{ user_id: userId, name, description, configs, is_active }])
+    .insert([{ user_id: user.id, name, description, configs, is_active }])
     .select();
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
 }
 
-// Get all workflows for the current user
+// Get all workflows for the current user (RLS auto-filters)
 export async function GET(req: NextRequest) {
-  const userId = await getServerUserId();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const supabase = await createRLSClient();
 
   const { searchParams } = new URL(req.url);
   const includeSteps = searchParams.get('includeSteps') === 'true';
 
   if (includeSteps) {
-    // Fetch workflows with their steps (filtered by user)
+    // Fetch workflows - RLS auto-filters to user's workflows
     const { data: workflows, error: workflowsError } = await supabase
       .from('Workflow')
       .select('*')
-      .eq('user_id', userId)
       .order('id');
 
     if (workflowsError) return NextResponse.json({ error: workflowsError.message }, { status: 500 });
@@ -51,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     const workflowIds = workflows.map(w => w.id);
 
-    // Fetch workflow steps only for user's workflows
+    // Fetch workflow steps - RLS auto-filters to user's workflow steps
     const { data: allSteps, error: stepsError } = await supabase
       .from('WorkflowStep')
       .select('*')
@@ -78,11 +73,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(workflowsWithSteps);
   }
 
-  // Default: fetch workflows without steps (filtered by user)
+  // Default: fetch workflows without steps - RLS auto-filters
   const { data, error } = await supabase
     .from('Workflow')
-    .select('*')
-    .eq('user_id', userId);
+    .select('*');
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

@@ -1,5 +1,6 @@
 import { createClient as createSupabaseServerClient } from "@supabase/supabase-js"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createServerClient as createSSRServerClient } from "@supabase/ssr"
 
 // Returns a Supabase client appropriate for the current runtime
 export const createClient = () => {
@@ -74,4 +75,44 @@ export const createServerClient = () => {
       persistSession: false,
     },
   })
+}
+
+/**
+ * Create a Supabase client for API routes with RLS authentication
+ * This client respects Row Level Security policies and uses the authenticated user's session
+ * Use this in API routes to automatically filter data based on the logged-in user
+ */
+export const createRLSClient = async () => {
+  // Import cookies dynamically to avoid making the entire module server-only
+  const { cookies } = await import("next/headers")
+  const cookieStore = await cookies()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Missing Supabase credentials. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
+    )
+  }
+
+  return createSSRServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+            })
+          } catch {
+            // Cookie setting can fail during SSR - safe to ignore
+          }
+        },
+      },
+    }
+  )
 }

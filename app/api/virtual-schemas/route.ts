@@ -1,24 +1,23 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-client';
-import { getServerUserId } from '@/lib/auth-helpers';
+import { createRLSClient } from '@/lib/supabase-client';
 import { VirtualSchema } from '@/lib/types';
-
-const supabase = createClient();
 
 // Create a new virtual schema
 export async function POST(req: NextRequest) {
-  const userId = await getServerUserId();
-  if (!userId) {
+  const supabase = await createRLSClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { name, description, configs } = await req.json() as Partial<VirtualSchema>;
   
-  // Always use the authenticated user's ID
+  // RLS policy will verify user_id matches auth.uid()
   const { data, error } = await supabase
     .from('VirtualSchema')
-    .insert([{ user_id: userId, name, description, configs }])
+    .insert([{ user_id: user.id, name, description, configs }])
     .select();
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -26,21 +25,17 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data[0], { status: 201 });
 }
 
-// Get all virtual schemas for the current user
+// Get all virtual schemas for the current user (RLS auto-filters)
 export async function GET(req: NextRequest) {
-  const userId = await getServerUserId();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const supabase = await createRLSClient();
 
   const { searchParams } = new URL(req.url)
   const includeTree = searchParams.get('includeTree') === 'true'
 
-  // Always filter by authenticated user's ID
+  // No manual filtering - RLS handles it automatically
   let vsQuery = supabase
     .from('VirtualSchema')
     .select('*')
-    .eq('user_id', userId)
 
   const { data: schemas, error } = await vsQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
