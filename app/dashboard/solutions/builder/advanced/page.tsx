@@ -32,6 +32,9 @@ import {
   Home,
   FileText,
   Workflow,
+  FormInput,
+  Edit3,
+  PlusSquare,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -164,6 +167,38 @@ export default function AdvancedSolutionBuilder() {
       category: "controles",
       description: "Panel de filtros para datos",
       configurable: ["filters", "layout", "defaultValues"],
+    },
+    {
+      id: "form-embed",
+      name: "Formulario Integrado",
+      icon: <FileText className="h-5 w-5" />,
+      category: "formularios",
+      description: "Muestra un formulario completo dentro de la solución",
+      configurable: ["formId", "tableId", "fieldMappings", "submitButton", "successMessage"],
+    },
+    {
+      id: "quick-input",
+      name: "Entrada Rápida",
+      icon: <Edit3 className="h-5 w-5" />,
+      category: "formularios",
+      description: "Campos de entrada rápida para agregar registros",
+      configurable: ["tableId", "fields", "submitButton"],
+    },
+    {
+      id: "data-entry-form",
+      name: "Formulario de Datos",
+      icon: <FormInput className="h-5 w-5" />,
+      category: "formularios",
+      description: "Formulario multi-campo para entrada de datos",
+      configurable: ["tableId", "fields", "layout", "validation"],
+    },
+    {
+      id: "form-selector",
+      name: "Selector de Formularios",
+      icon: <PlusSquare className="h-5 w-5" />,
+      category: "formularios",
+      description: "Dropdown para seleccionar y mostrar formularios",
+      configurable: ["forms", "defaultForm", "showDescription"],
     },
   ]
 
@@ -406,11 +441,45 @@ export default function AdvancedSolutionBuilder() {
 
     const { source, destination } = result
 
-    // Si se arrastra desde la paleta al canvas
-    if (source.droppableId === "component-palette" && destination.droppableId === "canvas") {
+    // Check if dragging from any palette to canvas
+    const isPaletteSource = source.droppableId.startsWith("component-palette")
+    const isCanvasDestination = destination.droppableId === "canvas"
+
+    // Si se arrastra desde cualquier paleta al canvas
+    if (isPaletteSource && isCanvasDestination) {
       console.log("Dragging from palette to canvas")
 
-      const component = availableComponents[source.index]
+      // Get the correct component based on the source tab
+      let component;
+      
+      if (source.droppableId === "component-palette") {
+        // From "all" tab - use direct index
+        component = availableComponents[source.index]
+      } else if (source.droppableId === "component-palette-formularios") {
+        // From "forms" tab - filter by category
+        const formComponents = availableComponents.filter((comp) => comp.category === "formularios")
+        component = formComponents[source.index]
+      } else if (source.droppableId === "component-palette-datos") {
+        // From "data" tab - filter by category
+        const dataComponents = availableComponents.filter((comp) => comp.category === "datos")
+        component = dataComponents[source.index]
+      } else if (source.droppableId === "component-palette-graficos") {
+        // From "charts" tab - filter by category
+        const chartComponents = availableComponents.filter((comp) => comp.category === "graficos")
+        component = chartComponents[source.index]
+      } else if (source.droppableId === "component-palette-metricas") {
+        // From "metrics/others" tab - filter by category
+        const metricComponents = availableComponents.filter(
+          (comp) => comp.category === "metricas" || comp.category === "notificaciones" || comp.category === "controles"
+        )
+        component = metricComponents[source.index]
+      }
+
+      if (!component) {
+        console.error("Component not found for index:", source.index, "from:", source.droppableId)
+        return
+      }
+
       console.log("Component to add:", component)
 
       const newComponent = {
@@ -777,6 +846,92 @@ export default function AdvancedSolutionBuilder() {
           </Card>
         )
 
+      case "form-embed":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title || "Formulario"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs">Nombre</Label>
+                  <Input placeholder="Ingresa tu nombre" className="h-8" />
+                </div>
+                <div>
+                  <Label className="text-xs">Email</Label>
+                  <Input type="email" placeholder="correo@ejemplo.com" className="h-8" />
+                </div>
+                <Button size="sm" className="w-full h-8">Enviar</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )
+
+      case "quick-input":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title || "Entrada Rápida"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label className="text-xs">Nombre</Label>
+                  <Input placeholder="Agregar..." className="h-8" />
+                </div>
+                <Button size="sm" className="h-8">
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )
+
+      case "data-entry-form":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title || "Nuevo Registro"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Campo 1</Label>
+                    <Input className="h-8" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Campo 2</Label>
+                    <Input className="h-8" />
+                  </div>
+                </div>
+                <Button size="sm" className="w-full h-8">Guardar</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )
+
+      case "form-selector":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title || "Seleccionar Formulario"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select>
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Selecciona un formulario" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="form1">Formulario de Contacto</SelectItem>
+                  <SelectItem value="form2">Formulario de Registro</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )
+
       default:
         return (
           <Card className="h-full">
@@ -908,30 +1063,309 @@ export default function AdvancedSolutionBuilder() {
           </div>
         )}
 
-        {component.type === "data-table" && (
-          <div>
-            <Label>Columnas a Mostrar</Label>
-            <div className="space-y-2 mt-2">
+        {/* Configuration for form-embed component */}
+        {component.type === "form-embed" && (
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="form-select">Formulario</Label>
+              <Select
+                value={(component.config as any).formId?.toString() || ""}
+                onValueChange={(value) => updateComponentConfig(component.id, { formId: parseInt(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar formulario" />
+                </SelectTrigger>
+                <SelectContent>
+                  {forms.length > 0 ? (
+                    forms.map((form) => (
+                      <SelectItem key={form.id} value={form.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          <span>{form.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      No hay formularios disponibles
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="submit-button-text">Texto del Botón</Label>
+              <Input
+                id="submit-button-text"
+                value={(component.config as any).submitButtonText || "Enviar"}
+                onChange={(e) => updateComponentConfig(component.id, { submitButtonText: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="success-message">Mensaje de Éxito</Label>
+              <Textarea
+                id="success-message"
+                value={(component.config as any).successMessage || "¡Datos guardados exitosamente!"}
+                onChange={(e) => updateComponentConfig(component.id, { successMessage: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Configuration for quick-input component */}
+        {(component.type === "quick-input" || component.type === "data-entry-form") && (
+          <div className="space-y-3">
+            <div>
+              <Label>Campos del Formulario</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Los campos se crearán automáticamente basados en la tabla seleccionada
+              </p>
               {dataSources
                 .find((ds) => ds.id === component.config.dataSource)
-                ?.fields.map((field: string) => (
-                  <div key={field} className="flex items-center space-x-2">
-                    <Switch
-                      id={`field-${field}`}
-                      checked={component.config.columns?.includes(field) || false}
-                      onCheckedChange={(checked) => {
-                        const currentColumns = component.config.columns || []
-                        const newColumns = checked
-                          ? [...currentColumns, field]
-                          : currentColumns.filter((col) => col !== field)
-                        updateComponentConfig(component.id, { columns: newColumns })
-                      }}
-                    />
-                    <Label htmlFor={`field-${field}`} className="capitalize">
-                      {field.replace("_", " ")}
-                    </Label>
+                ?.fields.slice(0, 5).map((field: string) => (
+                  <div key={field} className="flex items-center space-x-2 mb-1">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <span className="text-xs capitalize">{field.replace("_", " ")}</span>
                   </div>
                 ))}
+            </div>
+            <div>
+              <Label htmlFor="submit-btn-text">Texto del Botón</Label>
+              <Input
+                id="submit-btn-text"
+                value={(component.config as any).submitButtonText || "Guardar"}
+                onChange={(e) => updateComponentConfig(component.id, { submitButtonText: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Configuration for form-selector component */}
+        {component.type === "form-selector" && (
+          <div className="space-y-3">
+            <div>
+              <Label>Formularios Disponibles</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Los usuarios podrán seleccionar entre estos formularios
+              </p>
+              <div className="space-y-1">
+                {forms.slice(0, 3).map((form) => (
+                  <div key={form.id} className="flex items-center space-x-2 p-2 border rounded">
+                    <FileText className="h-3 w-3" />
+                    <span className="text-xs">{form.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="show-description"
+                checked={(component.config as any).showDescription || false}
+                onCheckedChange={(checked) => updateComponentConfig(component.id, { showDescription: checked })}
+              />
+              <Label htmlFor="show-description" className="text-xs">Mostrar Descripción</Label>
+            </div>
+          </div>
+        )}
+
+        {component.type === "data-table" && (
+          <div className="space-y-4">
+            <div>
+              <Label>Configuración de Columnas</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Configura las columnas que se mostrarán en la tabla
+              </p>
+              <div className="space-y-3 mt-2">
+                {dataSources
+                  .find((ds) => ds.id === component.config.dataSource)
+                  ?.fields.map((field: string) => {
+                    const columnConfig = ((component.config as any).columnConfigs || []).find(
+                      (col: any) => col.field === field
+                    ) || { field, label: field, type: 'text', editable: false, visible: true }
+                    
+                    return (
+                      <Card key={field} className="p-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id={`visible-${field}`}
+                                checked={columnConfig.visible !== false}
+                                onCheckedChange={(checked) => {
+                                  const configs = (component.config as any).columnConfigs || []
+                                  const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                  updateComponentConfig(component.id, { 
+                                    columnConfigs: [...otherConfigs, { ...columnConfig, visible: checked }]
+                                  })
+                                }}
+                              />
+                              <Label htmlFor={`visible-${field}`} className="capitalize font-medium text-sm">
+                                {field.replace("_", " ")}
+                              </Label>
+                            </div>
+                          </div>
+                          
+                          {columnConfig.visible !== false && (
+                            <>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label className="text-xs">Tipo</Label>
+                                  <Select
+                                    value={columnConfig.type || 'text'}
+                                    onValueChange={(value) => {
+                                      const configs = (component.config as any).columnConfigs || []
+                                      const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                      updateComponentConfig(component.id, { 
+                                        columnConfigs: [...otherConfigs, { ...columnConfig, type: value }]
+                                      })
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="text">Texto</SelectItem>
+                                      <SelectItem value="number">Número</SelectItem>
+                                      <SelectItem value="date">Fecha</SelectItem>
+                                      <SelectItem value="dropdown">Dropdown</SelectItem>
+                                      <SelectItem value="boolean">Booleano</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="flex items-center space-x-2 pt-5">
+                                  <Switch
+                                    id={`editable-${field}`}
+                                    checked={columnConfig.editable || false}
+                                    onCheckedChange={(checked) => {
+                                      const configs = (component.config as any).columnConfigs || []
+                                      const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                      updateComponentConfig(component.id, { 
+                                        columnConfigs: [...otherConfigs, { ...columnConfig, editable: checked }]
+                                      })
+                                    }}
+                                  />
+                                  <Label htmlFor={`editable-${field}`} className="text-xs">Editable</Label>
+                                </div>
+                              </div>
+
+                              {columnConfig.type === 'dropdown' && (
+                                <div>
+                                  <Label className="text-xs">Opciones del Dropdown</Label>
+                                  <div className="space-y-1 mt-1">
+                                    {(columnConfig.options || []).map((opt: any, idx: number) => (
+                                      <div key={idx} className="flex items-center gap-1">
+                                        <Input 
+                                          value={opt.label} 
+                                          className="h-6 text-xs flex-1"
+                                          placeholder="Etiqueta"
+                                          onChange={(e) => {
+                                            const configs = (component.config as any).columnConfigs || []
+                                            const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                            const newOptions = [...(columnConfig.options || [])]
+                                            newOptions[idx] = { ...opt, label: e.target.value, value: e.target.value.toLowerCase() }
+                                            updateComponentConfig(component.id, { 
+                                              columnConfigs: [...otherConfigs, { ...columnConfig, options: newOptions }]
+                                            })
+                                          }}
+                                        />
+                                        <Select
+                                          value={opt.color || 'gray'}
+                                          onValueChange={(color) => {
+                                            const configs = (component.config as any).columnConfigs || []
+                                            const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                            const newOptions = [...(columnConfig.options || [])]
+                                            newOptions[idx] = { ...opt, color }
+                                            updateComponentConfig(component.id, { 
+                                              columnConfigs: [...otherConfigs, { ...columnConfig, options: newOptions }]
+                                            })
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-6 w-20 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="gray">Gris</SelectItem>
+                                            <SelectItem value="red">Rojo</SelectItem>
+                                            <SelectItem value="yellow">Amarillo</SelectItem>
+                                            <SelectItem value="green">Verde</SelectItem>
+                                            <SelectItem value="blue">Azul</SelectItem>
+                                            <SelectItem value="purple">Morado</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <Button 
+                                          size="sm" 
+                                          variant="ghost" 
+                                          className="h-6 w-6 p-0"
+                                          onClick={() => {
+                                            const configs = (component.config as any).columnConfigs || []
+                                            const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                            const newOptions = (columnConfig.options || []).filter((_: any, i: number) => i !== idx)
+                                            updateComponentConfig(component.id, { 
+                                              columnConfigs: [...otherConfigs, { ...columnConfig, options: newOptions }]
+                                            })
+                                          }}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="h-6 w-full text-xs"
+                                      onClick={() => {
+                                        const configs = (component.config as any).columnConfigs || []
+                                        const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                        const newOptions = [...(columnConfig.options || []), { value: '', label: '', color: 'gray' }]
+                                        updateComponentConfig(component.id, { 
+                                          columnConfigs: [...otherConfigs, { ...columnConfig, options: newOptions }]
+                                        })
+                                      }}
+                                    >
+                                      <Plus className="h-3 w-3 mr-1" />
+                                      Agregar Opción
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </Card>
+                    )
+                  })}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label className="text-sm">Opciones de Tabla</Label>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="allow-create"
+                  checked={(component.config as any).allowCreate !== false}
+                  onCheckedChange={(checked) => updateComponentConfig(component.id, { allowCreate: checked })}
+                />
+                <Label htmlFor="allow-create" className="text-xs">Permitir Crear</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="allow-edit"
+                  checked={(component.config as any).allowEdit !== false}
+                  onCheckedChange={(checked) => updateComponentConfig(component.id, { allowEdit: checked })}
+                />
+                <Label htmlFor="allow-edit" className="text-xs">Permitir Editar</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="allow-delete"
+                  checked={(component.config as any).allowDelete !== false}
+                  onCheckedChange={(checked) => updateComponentConfig(component.id, { allowDelete: checked })}
+                />
+                <Label htmlFor="allow-delete" className="text-xs">Permitir Eliminar</Label>
+              </div>
             </div>
           </div>
         )}
@@ -1146,18 +1580,21 @@ export default function AdvancedSolutionBuilder() {
                   <ScrollArea className="flex-1">
                     <div className="p-4">
                       <Tabs defaultValue="all">
-                        <TabsList className="grid w-full grid-cols-4">
-                          <TabsTrigger value="all" className="text-xs">
+                        <TabsList className="grid w-full grid-cols-5 gap-1">
+                          <TabsTrigger value="all" className="text-xs px-1">
                             Todo
                           </TabsTrigger>
-                          <TabsTrigger value="metrics" className="text-xs">
-                            Métricas
+                          <TabsTrigger value="forms" className="text-xs px-1">
+                            Forms
                           </TabsTrigger>
-                          <TabsTrigger value="data" className="text-xs">
+                          <TabsTrigger value="data" className="text-xs px-1">
                             Datos
                           </TabsTrigger>
-                          <TabsTrigger value="charts" className="text-xs">
+                          <TabsTrigger value="charts" className="text-xs px-1">
                             Gráficos
+                          </TabsTrigger>
+                          <TabsTrigger value="metrics" className="text-xs px-1">
+                            Otros
                           </TabsTrigger>
                         </TabsList>
 
@@ -1204,12 +1641,48 @@ export default function AdvancedSolutionBuilder() {
                           </Droppable>
                         </TabsContent>
 
+                        <TabsContent value="forms" className="mt-4">
+                          <Droppable droppableId="component-palette-formularios">
+                            {(provided) => (
+                              <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                                {availableComponents
+                                  .filter((comp) => comp.category === "formularios")
+                                  .map((component, index) => (
+                                    <Draggable key={component.id} draggableId={component.id} index={index}>
+                                      {(provided, snapshot) => (
+                                        <div
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          {...provided.dragHandleProps}
+                                          className={`p-3 border rounded-lg cursor-move hover:bg-accent transition-colors ${
+                                            snapshot.isDragging ? "shadow-lg" : ""
+                                          }`}
+                                        >
+                                          <div className="flex items-start gap-3">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded bg-primary/10">
+                                              {component.icon}
+                                            </div>
+                                            <div>
+                                              <h3 className="font-medium text-sm">{component.name}</h3>
+                                              <p className="text-xs text-muted-foreground">{component.description}</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        </TabsContent>
+
                         <TabsContent value="metrics" className="mt-4">
                           <Droppable droppableId="component-palette-metricas">
                             {(provided) => (
                               <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
                                 {availableComponents
-                                  .filter((comp) => comp.category === "metricas")
+                                  .filter((comp) => comp.category === "metricas" || comp.category === "notificaciones" || comp.category === "controles")
                                   .map((component, index) => (
                                     <Draggable key={component.id} draggableId={component.id} index={index}>
                                       {(provided, snapshot) => (

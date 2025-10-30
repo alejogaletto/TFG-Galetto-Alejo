@@ -164,3 +164,63 @@ export type Notification = {
   created_at: string;
   read_at?: string;
 };
+
+// Solution Component Configuration Types
+export type ColumnType = 'text' | 'number' | 'date' | 'dropdown' | 'boolean' | 'custom';
+
+export type DropdownOption = {
+  value: string;
+  label: string;
+  color?: string;
+};
+
+export type ColumnConfiguration = {
+  field: string;
+  label: string;
+  type: ColumnType;
+  editable?: boolean;
+  visible?: boolean;
+  options?: DropdownOption[];
+  width?: number;
+  align?: 'left' | 'center' | 'right';
+  format?: string;
+};
+
+export type FormComponentConfig = {
+  formId?: number;
+  tableId?: number;
+  schemaId?: number;
+  fieldMappings?: Record<string, string>;
+  submitButtonText?: string;
+  successMessage?: string;
+  showResetButton?: boolean;
+};
+
+export type DataTableComponentConfig = {
+  title?: string;
+  dataSource?: string;
+  tableId?: number;
+  schemaId?: number;
+  columns?: ColumnConfiguration[];
+  showActions?: boolean;
+  pagination?: boolean;
+  pageSize?: number;
+  allowCreate?: boolean;
+  allowEdit?: boolean;
+  allowDelete?: boolean;
+  filters?: any[];
+};
+
+export type QuickInputComponentConfig = {
+  title?: string;
+  tableId?: number;
+  schemaId?: number;
+  fields?: Array<{
+    name: string;
+    label: string;
+    type: string;
+    required?: boolean;
+    placeholder?: string;
+  }>;
+  submitButtonText?: string;
+};

@@ -1,6 +1,5 @@
 import { createClient as createSupabaseServerClient } from "@supabase/supabase-js"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { createServerClient as createSSRServerClient } from "@supabase/ssr"
+import { createServerClient as createSSRServerClient, createBrowserClient as createSSRBrowserClient } from "@supabase/ssr"
 
 // Returns a Supabase client appropriate for the current runtime
 export const createClient = () => {
@@ -20,17 +19,22 @@ export const createClient = () => {
     return createSupabaseServerClient(supabaseUrl, keyToUse)
   }
 
-  // Client-side: use Next.js auth helpers client
-  return createClientComponentClient()
+  // Client-side: use @supabase/ssr browser client for consistent cookie handling
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  return createSSRBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
 /**
  * Create a Supabase client for browser-side auth operations
  * This client respects RLS and uses the anon key
- * Safe to use in client components (handles SSR automatically)
+ * Uses @supabase/ssr for consistent cookie handling with server
  */
 export const createBrowserClient = () => {
-  return createClientComponentClient()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  
+  return createSSRBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
 /**

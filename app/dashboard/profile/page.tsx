@@ -80,14 +80,39 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      // Check Supabase Auth session
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      console.log('[Profile] Loading profile...')
+      
+      // Check Supabase Auth session with retry logic
+      let user = null
+      let authError = null
+      
+      try {
+        const result = await supabase.auth.getUser()
+        user = result.data.user
+        authError = result.error
+      } catch (cookieError: any) {
+        console.error('[Profile] Cookie parsing error:', cookieError.message)
+        // Try to refresh session if cookie parsing fails
+        try {
+          const { data: sessionData } = await supabase.auth.getSession()
+          user = sessionData.session?.user || null
+        } catch (sessionError) {
+          console.error('[Profile] Session refresh failed:', sessionError)
+        }
+      }
 
       if (authError || !user) {
-        console.error("No user session:", authError)
+        console.error('[Profile] No user session:', authError?.message || 'No user')
+        toast({
+          title: "Sesión expirada",
+          description: "Por favor inicia sesión nuevamente",
+          variant: "destructive",
+        })
         router.push("/login")
         return
       }
+
+      console.log('[Profile] User session found:', user.id)
 
       // Load user profile from User table
       const { data: profileData, error: profileError } = await supabase

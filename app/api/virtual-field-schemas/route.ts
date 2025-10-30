@@ -1,22 +1,29 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-client';
-import { VirtualFieldSchema } from '@/lib/types';
 
 const supabase = createClient();
 
-// Create a new virtual field schema
-export async function POST(req: NextRequest) {
-  const { name, type, virtual_table_schema_id, properties } = await req.json() as VirtualFieldSchema;
-  const { data, error } = await supabase.from('VirtualFieldSchema').insert([{ name, type, virtual_table_schema_id, properties }]).select();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data || data.length === 0) return NextResponse.json({ error: 'Failed to create virtual field schema' }, { status: 500 });
-  return NextResponse.json(data[0], { status: 201 });
-}
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const tableId = searchParams.get('virtual_table_schema_id');
 
-// Get all virtual field schemas
-export async function GET() {
-  const { data, error } = await supabase.from('VirtualFieldSchema').select('*');
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+    let query = supabase.from('VirtualFieldSchema').select('*');
+
+    if (tableId) {
+      query = query.eq('virtual_table_schema_id', tableId);
+    }
+
+    const { data, error } = await query.order('id', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching virtual field schemas:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data || [], { status: 200 });
+  } catch (error) {
+    console.error('Error in GET /api/virtual-field-schemas:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
