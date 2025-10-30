@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
           id: user.id,
           email: user.email || '',
           name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split("@")[0] || 'User',
-          password: '', // OAuth users don't have passwords
+          password: null, // OAuth users don't have passwords
           configs: { companyName: user.user_metadata?.company_name }
         }
         
