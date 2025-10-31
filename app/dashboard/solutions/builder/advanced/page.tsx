@@ -263,7 +263,7 @@ export default function AdvancedSolutionBuilder() {
     fetchData()
   }, [])
 
-  // Load saved solution if editing existing
+  // Load saved solution if editing existing, or initialize with template if new
   useEffect(() => {
     const loadSolution = async () => {
       if (!solutionId) return
@@ -273,9 +273,22 @@ export default function AdvancedSolutionBuilder() {
         if (response.ok) {
           const solution = await response.json()
 
-          if (solution.configs?.canvas) {
+          // If this is a new solution from a template, initialize with template components
+          if (isNewSolution && templateType && !solution.configs?.canvas) {
+            const initialComponents = getInitialComponents(templateType)
+            setCanvasComponents(initialComponents)
+            setHistory([initialComponents])
+            setHistoryIndex(0)
+          }
+          // Otherwise, load existing canvas or keep empty
+          else if (solution.configs?.canvas) {
             setCanvasComponents(solution.configs.canvas)
             setHistory([solution.configs.canvas])
+            setHistoryIndex(0)
+          } else {
+            // Explicitly set empty canvas for existing solutions without components
+            setCanvasComponents([])
+            setHistory([[]])
             setHistoryIndex(0)
           }
 
@@ -287,7 +300,7 @@ export default function AdvancedSolutionBuilder() {
     }
 
     loadSolution()
-  }, [solutionId])
+  }, [solutionId, isNewSolution, templateType])
 
   // Función para obtener componentes iniciales según la plantilla
   const getInitialComponents = (template: string) => {
@@ -385,10 +398,8 @@ export default function AdvancedSolutionBuilder() {
     }
   }
 
-  // Componentes en el canvas - inicializar con plantilla
-  const [canvasComponents, setCanvasComponents] = useState(() => {
-    return getInitialComponents(templateType)
-  })
+  // Componentes en el canvas - inicializar vacío (se cargará desde la API si existe)
+  const [canvasComponents, setCanvasComponents] = useState<any[]>([])
 
   const [selectedCanvasComponent, setSelectedCanvasComponent] = useState(null)
 
