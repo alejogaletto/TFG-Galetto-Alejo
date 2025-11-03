@@ -58,10 +58,12 @@ import {
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AdvancedSolutionBuilder() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { toast } = useToast()
   const [solutionName, setSolutionName] = useState("Mi Solución Personalizada")
   const [solutionId, setSolutionId] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState(null)
@@ -71,6 +73,10 @@ export default function AdvancedSolutionBuilder() {
   const [isNewSolution, setIsNewSolution] = useState(false)
   const [templateType, setTemplateType] = useState("")
   const [userId, setUserId] = useState<number | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [lastSavedState, setLastSavedState] = useState<string>("")
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
 
   // Inicializar desde parámetros URL
   useEffect(() => {
@@ -205,6 +211,7 @@ export default function AdvancedSolutionBuilder() {
   // Fuentes de datos disponibles - ahora dinámicas
   const [dataSources, setDataSources] = useState<any[]>([])
   const [forms, setForms] = useState<any[]>([])
+  const [formFields, setFormFields] = useState<Record<number, any[]>>({}) // Store fields by form ID
   const [workflows, setWorkflows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -245,6 +252,21 @@ export default function AdvancedSolutionBuilder() {
         if (formsRes.ok) {
           const formsData = await formsRes.json()
           setForms(formsData || [])
+          
+          // Fetch fields for each form
+          const fieldsMap: Record<number, any[]> = {}
+          for (const form of formsData || []) {
+            try {
+              const fieldsRes = await fetch(`/api/form-fields?form_id=${form.id}`)
+              if (fieldsRes.ok) {
+                const fields = await fieldsRes.json()
+                fieldsMap[form.id] = fields || []
+              }
+            } catch (err) {
+              console.error(`Error fetching fields for form ${form.id}:`, err)
+            }
+          }
+          setFormFields(fieldsMap)
         }
 
         // Fetch Workflows
@@ -301,6 +323,22 @@ export default function AdvancedSolutionBuilder() {
 
     loadSolution()
   }, [solutionId, isNewSolution, templateType])
+
+  // Prevent navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = '¿Estás seguro de que quieres salir? Los cambios no guardados se perderán.'
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [hasUnsavedChanges])
 
   // Función para obtener componentes iniciales según la plantilla
   const getInitialComponents = (template: string) => {
@@ -500,7 +538,11 @@ export default function AdvancedSolutionBuilder() {
         size: { width: 2, height: 1 },
         config: {
           title: component.name,
-          dataSource: dataSources[0]?.id || "customers",
+          dataSource: dataSources[0]?.id || "",
+          tableId: null,
+          formId: null,
+          submitButtonText: 'Enviar',
+          successMessage: '¡Datos guardados exitosamente!'
         },
       }
 
@@ -510,6 +552,7 @@ export default function AdvancedSolutionBuilder() {
         const updated = [...prev, newComponent]
         console.log("Updated canvas components:", updated)
         updateHistory(updated)
+        setHasUnsavedChanges(true)
         return updated
       })
     }
@@ -524,6 +567,7 @@ export default function AdvancedSolutionBuilder() {
 
       setCanvasComponents(items)
       updateHistory(items)
+      setHasUnsavedChanges(true)
     }
   }
 
@@ -533,6 +577,7 @@ export default function AdvancedSolutionBuilder() {
         comp.id === componentId ? { ...comp, config: { ...comp.config, ...newConfig } } : comp
       )
       updateHistory(updated)
+      setHasUnsavedChanges(true)
       return updated
     })
   }
@@ -544,6 +589,7 @@ export default function AdvancedSolutionBuilder() {
       return updated
     })
     setSelectedCanvasComponent(null)
+    setHasUnsavedChanges(true)
   }
 
   const duplicateComponent = (componentId: string) => {
@@ -557,13 +603,18 @@ export default function AdvancedSolutionBuilder() {
       const updated = [...canvasComponents, newComponent]
       setCanvasComponents(updated)
       updateHistory(updated)
+      setHasUnsavedChanges(true)
     }
   }
 
   // Save functionality
   const handleSave = async () => {
     if (!solutionId) {
-      alert('No se encontró el ID de la solución')
+      toast({
+        title: "Error",
+        description: "No se encontró el ID de la solución",
+        variant: "destructive",
+      })
       return
     }
 
@@ -622,12 +673,45 @@ export default function AdvancedSolutionBuilder() {
         }
       }
 
-      alert('Solución guardada exitosamente')
+      setHasUnsavedChanges(false)
+      setLastSavedState(JSON.stringify(canvasComponents))
+      toast({
+        title: "Éxito",
+        description: "Solución guardada exitosamente",
+      })
       router.push(`/dashboard/solutions/${solutionId}`)
     } catch (error) {
       console.error('Error saving solution:', error)
-      alert('Error al guardar la solución')
+      toast({
+        title: "Error",
+        description: "Error al guardar la solución",
+        variant: "destructive",
+      })
     }
+  }
+
+  // Handle navigation with unsaved changes
+  const handleNavigation = (href: string) => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation(href)
+      setShowUnsavedDialog(true)
+    } else {
+      router.push(href)
+    }
+  }
+
+  const confirmNavigation = () => {
+    if (pendingNavigation) {
+      setHasUnsavedChanges(false)
+      router.push(pendingNavigation)
+    }
+    setShowUnsavedDialog(false)
+    setPendingNavigation(null)
+  }
+
+  const cancelNavigation = () => {
+    setShowUnsavedDialog(false)
+    setPendingNavigation(null)
   }
 
   // Preview mode toggle
@@ -653,41 +737,49 @@ export default function AdvancedSolutionBuilder() {
         )
 
       case "data-table":
+        const selectedDataSource = dataSources.find(ds => ds.id === component.config.dataSource)
+        const visibleColumns = (component.config.columnConfigs || []).filter((col: any) => col.visible !== false)
+        const displayColumns = visibleColumns.length > 0 
+          ? visibleColumns 
+          : selectedDataSource?.fields.slice(0, 3).map((f: string) => ({ field: f, label: f })) || []
+        
         return (
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-sm">{component.config.title}</CardTitle>
+              {selectedDataSource && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Fuente: {selectedDataSource.name}
+                </p>
+              )}
             </CardHeader>
             <CardContent>
-              <UITable>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Nombre</TableHead>
-                    <TableHead className="text-xs">Email</TableHead>
-                    <TableHead className="text-xs">Estado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="text-xs">Juan Pérez</TableCell>
-                    <TableCell className="text-xs">juan@example.com</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        Activo
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs">María García</TableCell>
-                    <TableCell className="text-xs">maria@example.com</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        Activo
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </UITable>
+              {component.config.dataSource && selectedDataSource ? (
+                <UITable>
+                  <TableHeader>
+                    <TableRow>
+                      {displayColumns.slice(0, 4).map((col: any) => (
+                        <TableHead key={col.field} className="text-xs">
+                          {col.label || col.field}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      {displayColumns.slice(0, 4).map((col: any) => (
+                        <TableCell key={col.field} className="text-xs">
+                          <span className="text-muted-foreground">-</span>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableBody>
+                </UITable>
+              ) : (
+                <div className="text-xs text-muted-foreground text-center py-4">
+                  Selecciona una fuente de datos
+                </div>
+              )}
             </CardContent>
           </Card>
         )
@@ -858,37 +950,68 @@ export default function AdvancedSolutionBuilder() {
         )
 
       case "form-embed":
+        const selectedForm = forms.find(f => f.id === component.config.formId)
+        const selectedFormFields = component.config.formId ? formFields[component.config.formId] || [] : []
         return (
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-sm">{component.config.title || "Formulario"}</CardTitle>
+              {selectedForm && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Formulario: {selectedForm.name}
+                </p>
+              )}
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-xs">Nombre</Label>
-                  <Input placeholder="Ingresa tu nombre" className="h-8" />
+              {component.config.formId && selectedForm ? (
+                <div className="space-y-3">
+                  {selectedFormFields.length > 0 ? (
+                    <>
+                      {selectedFormFields.map((field: any) => (
+                        <div key={field.id}>
+                          <Label className="text-xs">{field.label}</Label>
+                          <Input 
+                            placeholder={field.configs?.placeholder || ''} 
+                            className="h-8"
+                            disabled
+                          />
+                        </div>
+                      ))}
+                      <Button size="sm" className="w-full h-8">
+                        {component.config.submitButtonText || "Enviar"}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="text-xs text-muted-foreground text-center py-4">
+                      Este formulario no tiene campos configurados
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label className="text-xs">Email</Label>
-                  <Input type="email" placeholder="correo@ejemplo.com" className="h-8" />
+              ) : (
+                <div className="text-xs text-muted-foreground text-center py-4">
+                  Selecciona un formulario en la configuración
                 </div>
-                <Button size="sm" className="w-full h-8">Enviar</Button>
-              </div>
+              )}
             </CardContent>
           </Card>
         )
 
       case "quick-input":
+        const quickInputDataSource = dataSources.find(ds => ds.id === component.config.dataSource)
         return (
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-sm">{component.config.title || "Entrada Rápida"}</CardTitle>
+              {quickInputDataSource && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tabla: {quickInputDataSource.name}
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
-                  <Label className="text-xs">Nombre</Label>
+                  <Label className="text-xs">Entrada rápida</Label>
                   <Input placeholder="Agregar..." className="h-8" />
                 </div>
                 <Button size="sm" className="h-8">
@@ -900,25 +1023,38 @@ export default function AdvancedSolutionBuilder() {
         )
 
       case "data-entry-form":
+        const dataEntryDataSource = dataSources.find(ds => ds.id === component.config.dataSource)
+        const dataEntryFields = dataEntryDataSource?.fields.slice(0, 4) || []
         return (
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-sm">{component.config.title || "Nuevo Registro"}</CardTitle>
+              {dataEntryDataSource && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tabla: {dataEntryDataSource.name}
+                </p>
+              )}
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Campo 1</Label>
-                    <Input className="h-8" />
+              {component.config.dataSource && dataEntryDataSource ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {dataEntryFields.map((field: string) => (
+                      <div key={field}>
+                        <Label className="text-xs capitalize">{field.replace('_', ' ')}</Label>
+                        <Input className="h-8" />
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <Label className="text-xs">Campo 2</Label>
-                    <Input className="h-8" />
-                  </div>
+                  <Button size="sm" className="w-full h-8">
+                    {component.config.submitButtonText || "Guardar"}
+                  </Button>
                 </div>
-                <Button size="sm" className="w-full h-8">Guardar</Button>
-              </div>
+              ) : (
+                <div className="text-xs text-muted-foreground text-center py-4">
+                  Selecciona una fuente de datos
+                </div>
+              )}
             </CardContent>
           </Card>
         )
@@ -930,15 +1066,17 @@ export default function AdvancedSolutionBuilder() {
               <CardTitle className="text-sm">{component.config.title || "Seleccionar Formulario"}</CardTitle>
             </CardHeader>
             <CardContent>
-              <Select>
-                <SelectTrigger className="h-8">
-                  <SelectValue placeholder="Selecciona un formulario" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="form1">Formulario de Contacto</SelectItem>
-                  <SelectItem value="form2">Formulario de Registro</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Select>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Selecciona un formulario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="form1">Formulario de Contacto</SelectItem>
+                    <SelectItem value="form2">Formulario de Registro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
           </Card>
         )
@@ -960,16 +1098,24 @@ export default function AdvancedSolutionBuilder() {
   const renderConfigPanel = () => {
     if (!selectedCanvasComponent) return null
 
+    // Get fresh component from state on each render
     const component = canvasComponents.find((comp) => comp.id === selectedCanvasComponent)
-    if (!component) return null
+    if (!component) {
+      setSelectedCanvasComponent(null)
+      return null
+    }
+
+    // Ensure config exists
+    const config = component.config || {}
 
     return (
       <div className="space-y-4">
         <div>
           <Label htmlFor="component-title">Título</Label>
           <Input
+            key={`title-${component.id}`}
             id="component-title"
-            value={component.config.title || ""}
+            value={config.title || ""}
             onChange={(e) => updateComponentConfig(component.id, { title: e.target.value })}
           />
         </div>
@@ -977,7 +1123,8 @@ export default function AdvancedSolutionBuilder() {
         <div>
           <Label htmlFor="data-source">Fuente de Datos</Label>
           <Select
-            value={component.config.dataSource || ""}
+            key={`datasource-${component.id}-${config.dataSource}`}
+            value={config.dataSource || ""}
             onValueChange={(value) => {
               const selectedSource = dataSources.find(ds => ds.id === value)
               updateComponentConfig(component.id, { 
@@ -1012,43 +1159,13 @@ export default function AdvancedSolutionBuilder() {
           </Select>
         </div>
 
-        {/* Form selector for form-related components */}
-        {(component.type === "form" || component.type === "form-embed") && (
-          <div>
-            <Label htmlFor="form-select">Formulario</Label>
-            <Select
-              value={(component.config as any).formId?.toString() || ""}
-              onValueChange={(value) => updateComponentConfig(component.id, { formId: parseInt(value) })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar formulario" />
-              </SelectTrigger>
-              <SelectContent>
-                {forms.length > 0 ? (
-                  forms.map((form) => (
-                    <SelectItem key={form.id} value={form.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span>{form.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-2 text-sm text-muted-foreground">
-                    No hay formularios disponibles
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
         {/* Workflow selector for automation components */}
         {component.type === "workflow-trigger" && (
           <div>
             <Label htmlFor="workflow-select">Flujo de Trabajo</Label>
             <Select
-              value={(component.config as any).workflowId?.toString() || ""}
+              key={`workflow-select-${component.id}-${config.workflowId}`}
+              value={config.workflowId?.toString() || ""}
               onValueChange={(value) => updateComponentConfig(component.id, { workflowId: parseInt(value) })}
             >
               <SelectTrigger>
@@ -1080,7 +1197,8 @@ export default function AdvancedSolutionBuilder() {
             <div>
               <Label htmlFor="form-select">Formulario</Label>
               <Select
-                value={(component.config as any).formId?.toString() || ""}
+                key={`form-select-${component.id}-${config.formId}`}
+                value={config.formId?.toString() || ""}
                 onValueChange={(value) => updateComponentConfig(component.id, { formId: parseInt(value) })}
               >
                 <SelectTrigger>
@@ -1107,16 +1225,18 @@ export default function AdvancedSolutionBuilder() {
             <div>
               <Label htmlFor="submit-button-text">Texto del Botón</Label>
               <Input
+                key={`submit-button-${component.id}`}
                 id="submit-button-text"
-                value={(component.config as any).submitButtonText || "Enviar"}
+                value={config.submitButtonText || "Enviar"}
                 onChange={(e) => updateComponentConfig(component.id, { submitButtonText: e.target.value })}
               />
             </div>
             <div>
               <Label htmlFor="success-message">Mensaje de Éxito</Label>
               <Textarea
+                key={`success-message-${component.id}`}
                 id="success-message"
-                value={(component.config as any).successMessage || "¡Datos guardados exitosamente!"}
+                value={config.successMessage || "¡Datos guardados exitosamente!"}
                 onChange={(e) => updateComponentConfig(component.id, { successMessage: e.target.value })}
                 rows={2}
               />
@@ -1133,7 +1253,7 @@ export default function AdvancedSolutionBuilder() {
                 Los campos se crearán automáticamente basados en la tabla seleccionada
               </p>
               {dataSources
-                .find((ds) => ds.id === component.config.dataSource)
+                .find((ds) => ds.id === config.dataSource)
                 ?.fields.slice(0, 5).map((field: string) => (
                   <div key={field} className="flex items-center space-x-2 mb-1">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
@@ -1144,8 +1264,9 @@ export default function AdvancedSolutionBuilder() {
             <div>
               <Label htmlFor="submit-btn-text">Texto del Botón</Label>
               <Input
+                key={`submit-btn-${component.id}`}
                 id="submit-btn-text"
-                value={(component.config as any).submitButtonText || "Guardar"}
+                value={config.submitButtonText || "Guardar"}
                 onChange={(e) => updateComponentConfig(component.id, { submitButtonText: e.target.value })}
               />
             </div>
@@ -1171,8 +1292,9 @@ export default function AdvancedSolutionBuilder() {
             </div>
             <div className="flex items-center space-x-2">
               <Switch
+                key={`show-desc-${component.id}`}
                 id="show-description"
-                checked={(component.config as any).showDescription || false}
+                checked={config.showDescription || false}
                 onCheckedChange={(checked) => updateComponentConfig(component.id, { showDescription: checked })}
               />
               <Label htmlFor="show-description" className="text-xs">Mostrar Descripción</Label>
@@ -1189,9 +1311,9 @@ export default function AdvancedSolutionBuilder() {
               </p>
               <div className="space-y-3 mt-2">
                 {dataSources
-                  .find((ds) => ds.id === component.config.dataSource)
+                  .find((ds) => ds.id === config.dataSource)
                   ?.fields.map((field: string) => {
-                    const columnConfig = ((component.config as any).columnConfigs || []).find(
+                    const columnConfig = (config.columnConfigs || []).find(
                       (col: any) => col.field === field
                     ) || { field, label: field, type: 'text', editable: false, visible: true }
                     
@@ -1201,10 +1323,11 @@ export default function AdvancedSolutionBuilder() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               <Switch
+                                key={`visible-${field}-${component.id}`}
                                 id={`visible-${field}`}
                                 checked={columnConfig.visible !== false}
                                 onCheckedChange={(checked) => {
-                                  const configs = (component.config as any).columnConfigs || []
+                                  const configs = config.columnConfigs || []
                                   const otherConfigs = configs.filter((c: any) => c.field !== field)
                                   updateComponentConfig(component.id, { 
                                     columnConfigs: [...otherConfigs, { ...columnConfig, visible: checked }]
@@ -1223,9 +1346,10 @@ export default function AdvancedSolutionBuilder() {
                                 <div>
                                   <Label className="text-xs">Tipo</Label>
                                   <Select
+                                    key={`type-${field}-${component.id}`}
                                     value={columnConfig.type || 'text'}
                                     onValueChange={(value) => {
-                                      const configs = (component.config as any).columnConfigs || []
+                                      const configs = config.columnConfigs || []
                                       const otherConfigs = configs.filter((c: any) => c.field !== field)
                                       updateComponentConfig(component.id, { 
                                         columnConfigs: [...otherConfigs, { ...columnConfig, type: value }]
@@ -1246,10 +1370,11 @@ export default function AdvancedSolutionBuilder() {
                                 </div>
                                 <div className="flex items-center space-x-2 pt-5">
                                   <Switch
+                                    key={`editable-${field}-${component.id}`}
                                     id={`editable-${field}`}
                                     checked={columnConfig.editable || false}
                                     onCheckedChange={(checked) => {
-                                      const configs = (component.config as any).columnConfigs || []
+                                      const configs = config.columnConfigs || []
                                       const otherConfigs = configs.filter((c: any) => c.field !== field)
                                       updateComponentConfig(component.id, { 
                                         columnConfigs: [...otherConfigs, { ...columnConfig, editable: checked }]
@@ -1271,7 +1396,7 @@ export default function AdvancedSolutionBuilder() {
                                           className="h-6 text-xs flex-1"
                                           placeholder="Etiqueta"
                                           onChange={(e) => {
-                                            const configs = (component.config as any).columnConfigs || []
+                                            const configs = config.columnConfigs || []
                                             const otherConfigs = configs.filter((c: any) => c.field !== field)
                                             const newOptions = [...(columnConfig.options || [])]
                                             newOptions[idx] = { ...opt, label: e.target.value, value: e.target.value.toLowerCase() }
@@ -1283,7 +1408,7 @@ export default function AdvancedSolutionBuilder() {
                                         <Select
                                           value={opt.color || 'gray'}
                                           onValueChange={(color) => {
-                                            const configs = (component.config as any).columnConfigs || []
+                                            const configs = config.columnConfigs || []
                                             const otherConfigs = configs.filter((c: any) => c.field !== field)
                                             const newOptions = [...(columnConfig.options || [])]
                                             newOptions[idx] = { ...opt, color }
@@ -1309,7 +1434,7 @@ export default function AdvancedSolutionBuilder() {
                                           variant="ghost" 
                                           className="h-6 w-6 p-0"
                                           onClick={() => {
-                                            const configs = (component.config as any).columnConfigs || []
+                                            const configs = config.columnConfigs || []
                                             const otherConfigs = configs.filter((c: any) => c.field !== field)
                                             const newOptions = (columnConfig.options || []).filter((_: any, i: number) => i !== idx)
                                             updateComponentConfig(component.id, { 
@@ -1326,7 +1451,7 @@ export default function AdvancedSolutionBuilder() {
                                       variant="outline" 
                                       className="h-6 w-full text-xs"
                                       onClick={() => {
-                                        const configs = (component.config as any).columnConfigs || []
+                                        const configs = config.columnConfigs || []
                                         const otherConfigs = configs.filter((c: any) => c.field !== field)
                                         const newOptions = [...(columnConfig.options || []), { value: '', label: '', color: 'gray' }]
                                         updateComponentConfig(component.id, { 
@@ -1355,24 +1480,27 @@ export default function AdvancedSolutionBuilder() {
               <Label className="text-sm">Opciones de Tabla</Label>
               <div className="flex items-center space-x-2">
                 <Switch
+                  key={`allow-create-${component.id}`}
                   id="allow-create"
-                  checked={(component.config as any).allowCreate !== false}
+                  checked={config.allowCreate !== false}
                   onCheckedChange={(checked) => updateComponentConfig(component.id, { allowCreate: checked })}
                 />
                 <Label htmlFor="allow-create" className="text-xs">Permitir Crear</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
+                  key={`allow-edit-${component.id}`}
                   id="allow-edit"
-                  checked={(component.config as any).allowEdit !== false}
+                  checked={config.allowEdit !== false}
                   onCheckedChange={(checked) => updateComponentConfig(component.id, { allowEdit: checked })}
                 />
                 <Label htmlFor="allow-edit" className="text-xs">Permitir Editar</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
+                  key={`allow-delete-${component.id}`}
                   id="allow-delete"
-                  checked={(component.config as any).allowDelete !== false}
+                  checked={config.allowDelete !== false}
                   onCheckedChange={(checked) => updateComponentConfig(component.id, { allowDelete: checked })}
                 />
                 <Label htmlFor="allow-delete" className="text-xs">Permitir Eliminar</Label>
@@ -1386,7 +1514,8 @@ export default function AdvancedSolutionBuilder() {
             <div>
               <Label htmlFor="value-field">Campo de Valor</Label>
               <Select
-                value={component.config.valueField || ""}
+                key={`value-field-${component.id}-${config.valueField}`}
+                value={config.valueField || ""}
                 onValueChange={(value) => updateComponentConfig(component.id, { valueField: value })}
               >
                 <SelectTrigger>
@@ -1394,7 +1523,7 @@ export default function AdvancedSolutionBuilder() {
                 </SelectTrigger>
                 <SelectContent>
                   {dataSources
-                    .find((ds) => ds.id === component.config.dataSource)
+                    .find((ds) => ds.id === config.dataSource)
                     ?.fields.map((field: string) => (
                       <SelectItem key={field} value={field}>
                         {field.replace("_", " ")}
@@ -1406,8 +1535,9 @@ export default function AdvancedSolutionBuilder() {
 
             <div className="flex items-center space-x-2">
               <Switch
+                key={`show-trend-${component.id}`}
                 id="show-trend"
-                checked={component.config.showTrend || false}
+                checked={config.showTrend || false}
                 onCheckedChange={(checked) => updateComponentConfig(component.id, { showTrend: checked })}
               />
               <Label htmlFor="show-trend">Mostrar Tendencia</Label>
@@ -1526,14 +1656,23 @@ export default function AdvancedSolutionBuilder() {
           {/* Header del Constructor */}
           <header className="sticky top-16 z-20 flex h-16 items-center gap-4 border-b bg-background px-6">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/dashboard/solutions">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => handleNavigation('/dashboard/solutions')}
+              >
+                <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="font-semibold text-lg">Constructor Avanzado de Soluciones</h1>
+                  <h1 className="font-semibold text-lg flex items-center gap-2">
+                    Constructor Avanzado de Soluciones
+                    {hasUnsavedChanges && (
+                      <Badge variant="destructive" className="text-xs">
+                        Cambios sin guardar
+                      </Badge>
+                    )}
+                  </h1>
                   {isNewSolution && (
                     <Badge variant="secondary" className="bg-green-100 text-green-800">
                       Nueva Solución
@@ -1854,7 +1993,9 @@ export default function AdvancedSolutionBuilder() {
                                   }}
                                   onClick={() => setSelectedCanvasComponent(component.id as any)}
                                 >
-                                  {renderComponentPreview(component)}
+                                  <div key={`preview-${component.id}-${JSON.stringify(component.config)}`}>
+                                    {renderComponentPreview(component)}
+                                  </div>
 
                                   {/* Controles del componente */}
                                   {!previewMode && (
@@ -1946,7 +2087,7 @@ export default function AdvancedSolutionBuilder() {
                           </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="component" className="mt-4">
+                        <TabsContent value="component" className="mt-4" key={selectedCanvasComponent}>
                           {selectedCanvasComponent ? (
                             renderConfigPanel()
                           ) : (
@@ -2253,6 +2394,26 @@ export default function AdvancedSolutionBuilder() {
               Cancelar
             </Button>
             <Button onClick={() => setShowComponentConfig(false)}>Aplicar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Changes Dialog */}
+      <Dialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Descartar cambios?</DialogTitle>
+            <DialogDescription>
+              Tienes cambios sin guardar. Si sales ahora, perderás estos cambios.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelNavigation}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmNavigation}>
+              Descartar Cambios
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
