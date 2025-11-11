@@ -268,19 +268,66 @@ export default function SolutionDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {component.config.columns?.map((col: string) => (
-                      <TableHead key={col}>{col}</TableHead>
-                    ))}
+                    {component.config.columns?.map((col: any) => {
+                      const colKey = typeof col === 'string' ? col : col.key
+                      const colLabel = typeof col === 'string' ? col : col.label || col.key
+                      return <TableHead key={colKey}>{colLabel}</TableHead>
+                    })}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(data || []).slice(0, 10).map((row: any, idx: number) => (
                     <TableRow key={idx}>
-                      {component.config.columns?.map((col: string) => (
-                        <TableCell key={col}>
-                          {row.data_json?.[col] || '-'}
-                        </TableCell>
-                      ))}
+                      {component.config.columns?.map((col: any) => {
+                        const colKey = typeof col === 'string' ? col : col.key
+                        const value = row.data_json?.[colKey]
+                        const format = typeof col === 'object' ? col.format : null
+                        const colType = typeof col === 'object' ? col.type : null
+                        const stageColors = typeof col === 'object' ? col.stageColors : null
+                        
+                        let displayValue = value || '-'
+                        
+                        // Badge rendering for stage column
+                        if (colType === 'badge' && stageColors && value) {
+                          const stageConfig = stageColors[value]
+                          if (stageConfig) {
+                            const colorMap: Record<string, string> = {
+                              blue: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+                              purple: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
+                              yellow: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
+                              orange: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
+                              green: 'bg-green-100 text-green-800 hover:bg-green-100',
+                              red: 'bg-red-100 text-red-800 hover:bg-red-100',
+                            }
+                            return (
+                              <TableCell key={colKey}>
+                                <Badge className={colorMap[stageConfig.color] || 'bg-gray-100 text-gray-800'}>
+                                  {stageConfig.label}
+                                </Badge>
+                              </TableCell>
+                            )
+                          }
+                        }
+                        
+                        // Currency formatting
+                        if (format === 'currency' && typeof value === 'number') {
+                          displayValue = new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: 'USD',
+                            minimumFractionDigits: 0,
+                          }).format(value)
+                        } 
+                        // Date formatting
+                        else if (format === 'date' && value) {
+                          displayValue = new Date(value).toLocaleDateString()
+                        }
+                        
+                        return (
+                          <TableCell key={colKey}>
+                            {displayValue}
+                          </TableCell>
+                        )
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -321,6 +368,171 @@ export default function SolutionDetailPage() {
               <p className="text-xs text-muted-foreground mt-2">
                 {data?.length || 0}%
               </p>
+            </CardContent>
+          </Card>
+        )
+
+      case "activity-timeline":
+        const activities = (data || []).slice(0, component.config.maxItems || 10)
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {activities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No hay actividades recientes
+                  </p>
+                ) : (
+                  activities.map((activity: any, idx: number) => {
+                    const activityData = activity.data_json
+                    const activityTypeIcons: Record<string, any> = {
+                      call: <Phone className="h-4 w-4" />,
+                      email: <Mail className="h-4 w-4" />,
+                      meeting: <Users className="h-4 w-4" />,
+                      task: <CheckCircle className="h-4 w-4" />,
+                      note: <FileText className="h-4 w-4" />,
+                    }
+                    const activityTypeColors: Record<string, string> = {
+                      call: 'bg-blue-100 text-blue-600',
+                      email: 'bg-purple-100 text-purple-600',
+                      meeting: 'bg-green-100 text-green-600',
+                      task: 'bg-orange-100 text-orange-600',
+                      note: 'bg-gray-100 text-gray-600',
+                    }
+                    const statusColors: Record<string, string> = {
+                      completed: 'text-green-600',
+                      planned: 'text-orange-600',
+                      cancelled: 'text-red-600',
+                    }
+                    
+                    return (
+                      <div key={idx} className="flex gap-3 pb-4 border-b last:border-0 last:pb-0">
+                        <div className={`flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${activityTypeColors[activityData?.type] || 'bg-gray-100'}`}>
+                          {activityTypeIcons[activityData?.type] || <Activity className="h-4 w-4" />}
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium">{activityData?.description || 'Sin descripción'}</p>
+                            {activityData?.status && (
+                              <Badge variant="outline" className={statusColors[activityData.status] || ''}>
+                                {activityData.status === 'completed' ? 'Completado' : 
+                                 activityData.status === 'planned' ? 'Planeado' : 
+                                 activityData.status}
+                              </Badge>
+                            )}
+                          </div>
+                          {component.config.showRelatedTo && activityData?.related_to && (
+                            <p className="text-xs text-muted-foreground">
+                              Relacionado: {activityData.related_to}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            {activityData?.date && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(activityData.date).toLocaleDateString()}
+                              </span>
+                            )}
+                            {component.config.showAssignedTo && activityData?.assigned_to && (
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {activityData.assigned_to}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )
+
+      case "contact-card-list":
+        const contacts = (data || [])
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {contacts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No hay contactos
+                </p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {contacts.map((contact: any, idx: number) => {
+                    const contactData = contact.data_json
+                    const initials = contactData?.name
+                      ?.split(' ')
+                      .map((n: string) => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2) || '?'
+                    
+                    const statusColors: Record<string, string> = {
+                      active: 'bg-green-100 text-green-800',
+                      inactive: 'bg-gray-100 text-gray-800',
+                      prospect: 'bg-blue-100 text-blue-800',
+                    }
+                    
+                    return (
+                      <div key={idx} className="flex gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback>{initials}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <p className="text-sm font-medium truncate">{contactData?.name || 'Sin nombre'}</p>
+                            {contactData?.status && (
+                              <Badge className={`${statusColors[contactData.status] || 'bg-gray-100'} text-xs`}>
+                                {contactData.status === 'active' ? 'Activo' : 
+                                 contactData.status === 'prospect' ? 'Prospecto' : 
+                                 contactData.status}
+                              </Badge>
+                            )}
+                          </div>
+                          {contactData?.company && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                              <Building className="h-3 w-3" />
+                              {contactData.company}
+                            </p>
+                          )}
+                          <div className="space-y-0.5">
+                            {contactData?.email && (
+                              <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                <Mail className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate">{contactData.email}</span>
+                              </p>
+                            )}
+                            {contactData?.phone && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                {contactData.phone}
+                              </p>
+                            )}
+                          </div>
+                          {contactData?.tags && (
+                            <div className="flex gap-1 mt-2 flex-wrap">
+                              {contactData.tags.split(',').slice(0, 2).map((tag: string, tidx: number) => (
+                                <Badge key={tidx} variant="outline" className="text-xs">
+                                  {tag.trim()}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         )

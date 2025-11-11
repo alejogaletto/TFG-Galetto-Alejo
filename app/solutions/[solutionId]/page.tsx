@@ -26,6 +26,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/hooks/use-toast"
 import { Progress } from "@/components/ui/progress"
 import type { ColumnConfiguration, DropdownOption } from "@/lib/types"
+import { KanbanBoard } from "@/components/crm/kanban-board"
+import { ContactCardList } from "@/components/crm/contact-card-list"
+import { ActivityTimeline } from "@/components/crm/activity-timeline"
+import { DealProgress } from "@/components/crm/deal-progress"
 
 export default function SolutionPublicView({ params }: { params: Promise<{ solutionId: string }> }) {
   const router = useRouter()
@@ -206,6 +210,15 @@ function ComponentRenderer({ component, userId }: { component: any; userId: numb
     case "chart-pie":
     case "chart-line":
       return <ChartPlaceholderComponent config={config} type={component.type} />
+    // CRM Components
+    case "kanban-board":
+      return <KanbanBoard tableId={config.tableId} config={config} />
+    case "contact-card-list":
+      return <ContactCardList tableId={config.tableId} config={config} />
+    case "activity-timeline":
+      return <ActivityTimeline tableId={config.tableId} config={config} />
+    case "deal-progress":
+      return <DealProgress dealId={config.dealId} tableId={config.tableId} config={config} />
     default:
       return <GenericComponentPlaceholder config={config} type={component.type} />
   }
@@ -474,64 +487,66 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
           )}
         </CardHeader>
         <CardContent className="flex-1 overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {visibleColumns.map((col) => (
-                  <TableHead key={col.field}>{col.label}</TableHead>
-                ))}
-                {(config.allowEdit !== false || config.allowDelete !== false) && (
-                  <TableHead>Acciones</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.length === 0 ? (
+          <div className="max-h-[600px] overflow-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  <TableCell colSpan={visibleColumns.length + 1} className="text-center text-muted-foreground">
-                    No hay datos disponibles
-                  </TableCell>
+                  {visibleColumns.map((col) => (
+                    <TableHead key={col.field}>{col.label}</TableHead>
+                  ))}
+                  {(config.allowEdit !== false || config.allowDelete !== false) && (
+                    <TableHead>Acciones</TableHead>
+                  )}
                 </TableRow>
-              ) : (
-                data.map((row) => (
-                  <TableRow key={row.id}>
-                    {visibleColumns.map((col) => (
-                      <TableCell key={col.field}>
-                        {renderCell(row, col)}
-                      </TableCell>
-                    ))}
-                    {(config.allowEdit !== false || config.allowDelete !== false) && (
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {config.allowEdit !== false && (
-                            editingRow === row.id ? (
-                              <>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleSave(row.id)}>
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingRow(null)}>
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </>
-                            ) : (
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEdit(row)}>
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                            )
-                          )}
-                          {config.allowDelete !== false && (
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDelete(row.id)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
+              </TableHeader>
+              <TableBody>
+                {data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={visibleColumns.length + 1} className="text-center text-muted-foreground">
+                      No hay datos disponibles
+                    </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  data.map((row) => (
+                    <TableRow key={row.id}>
+                      {visibleColumns.map((col) => (
+                        <TableCell key={col.field}>
+                          {renderCell(row, col)}
+                        </TableCell>
+                      ))}
+                      {(config.allowEdit !== false || config.allowDelete !== false) && (
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {config.allowEdit !== false && (
+                              editingRow === row.id ? (
+                                <>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleSave(row.id)}>
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingRow(null)}>
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEdit(row)}>
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              )
+                            )}
+                            {config.allowDelete !== false && (
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDelete(row.id)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

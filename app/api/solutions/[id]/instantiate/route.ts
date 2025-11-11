@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-client';
-
-const supabase = createClient();
+import { createRLSClient } from '@/lib/supabase-client';
 
 // Create a solution instance from a template
 export async function POST(
@@ -9,13 +7,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: template_id } = params;
-    const { user_id, name, description } = await req.json();
-
-    // Validate required fields
-    if (!user_id) {
-      return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
+    const supabase = await createRLSClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { id: template_id } = await params;
+    const body = await req.json();
+    const { name, description } = body;
 
     // Get the template solution
     const { data: template, error: templateError } = await supabase
@@ -30,16 +31,17 @@ export async function POST(
     }
 
     // Create a new solution instance based on the template
+    // RLS policy will automatically set user_id from auth.uid()
     const { data: newSolution, error: solutionError } = await supabase
       .from('Solution')
       .insert([{
-        user_id,
+        user_id: user.id,
         name: name || `${template.name} - Instance`,
         description: description || template.description,
         template_type: template.template_type,
         is_template: false,
         template_id: parseInt(template_id),
-        status: 'draft',
+        status: 'active',
         icon: template.icon,
         color: template.color,
         category: template.category,

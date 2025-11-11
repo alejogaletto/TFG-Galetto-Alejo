@@ -35,6 +35,8 @@ import {
   FormInput,
   Edit3,
   PlusSquare,
+  Loader2,
+  GripVertical,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -60,6 +62,178 @@ import { Progress } from "@/components/ui/progress"
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 
+// Data Table Preview Component
+function DataTablePreview({ component, dataSources }: { component: any, dataSources: any[] }) {
+  const [data, setData] = useState<any[]>([])
+  const [fields, setFields] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAddDialog, setShowAddDialog] = useState(false)
+  const [newRowData, setNewRowData] = useState<any>({})
+  
+  const selectedDataSource = dataSources.find(ds => ds.id === component.config.dataSource)
+  const tableId = component.config.dataSource?.replace('table-', '')
+  
+  useEffect(() => {
+    fetchData()
+    fetchFields()
+  }, [component.config.dataSource])
+  
+  const fetchData = async () => {
+    if (!tableId) {
+      setLoading(false)
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/business-data?virtual_table_schema_id=${tableId}`)
+      if (response.ok) {
+        const records = await response.json()
+        setData(records)
+      }
+    } catch (error) {
+      console.error('Error fetching table data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const fetchFields = async () => {
+    if (!tableId) return
+    
+    try {
+      const response = await fetch(`/api/virtual-field-schemas?virtual_table_schema_id=${tableId}`)
+      if (response.ok) {
+        const fieldsData = await response.json()
+        setFields(fieldsData)
+      }
+    } catch (error) {
+      console.error('Error fetching fields:', error)
+    }
+  }
+  
+  const handleAdd = async () => {
+    try {
+      const response = await fetch('/api/business-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          virtual_table_schema_id: tableId,
+          data_json: newRowData,
+        }),
+      })
+      
+      if (response.ok) {
+        fetchData()
+        setShowAddDialog(false)
+        setNewRowData({})
+      }
+    } catch (error) {
+      console.error('Error creating row:', error)
+    }
+  }
+  
+  const visibleColumns = (component.config.columnConfigs || []).filter((col: any) => col.visible !== false)
+  const displayColumns = visibleColumns.length > 0 ? visibleColumns : fields
+  
+  if (loading) {
+    return (
+      <Card className="h-full">
+        <CardContent className="flex items-center justify-center p-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </CardContent>
+      </Card>
+    )
+  }
+  
+  return (
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm">{component.config.title}</CardTitle>
+            {selectedDataSource && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Fuente: {selectedDataSource.name}
+              </p>
+            )}
+          </div>
+          <Button size="sm" onClick={() => setShowAddDialog(true)}>
+            <Plus className="h-3 w-3 mr-1" />
+            Agregar
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-auto p-0">
+        {component.config.dataSource && selectedDataSource ? (
+          <div className="max-h-[400px] overflow-auto">
+            <UITable>
+              <TableHeader className="sticky top-0 bg-background">
+                <TableRow>
+                  {displayColumns.map((col: any) => (
+                    <TableHead key={col.field || col.name} className="text-xs">
+                      {col.label || col.name}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.length > 0 ? (
+                  data.map((row) => (
+                    <TableRow key={row.id}>
+                      {displayColumns.map((col: any) => (
+                        <TableCell key={col.field || col.name} className="text-xs">
+                          {row.data_json?.[col.field || col.name]?.toString() || '-'}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={displayColumns.length} className="text-center text-xs text-muted-foreground">
+                      No hay datos disponibles
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </UITable>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground text-center py-4">
+            Selecciona una fuente de datos en la configuración
+          </div>
+        )}
+      </CardContent>
+      
+      {/* Add Row Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar Fila</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {fields.map((field) => (
+              <div key={field.id}>
+                <Label className="text-xs">{field.name}</Label>
+                <Input
+                  value={newRowData[field.name] || ''}
+                  onChange={(e) => setNewRowData({ ...newRowData, [field.name]: e.target.value })}
+                  className="h-8"
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAdd}>Agregar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
 export default function AdvancedSolutionBuilder() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -77,6 +251,9 @@ export default function AdvancedSolutionBuilder() {
   const [lastSavedState, setLastSavedState] = useState<string>("")
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  const [resizingComponent, setResizingComponent] = useState<string | null>(null)
+  const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 })
+  const [resizeStartSize, setResizeStartSize] = useState({ width: 1, height: 1 })
 
   // Inicializar desde parámetros URL
   useEffect(() => {
@@ -205,6 +382,39 @@ export default function AdvancedSolutionBuilder() {
       category: "formularios",
       description: "Dropdown para seleccionar y mostrar formularios",
       configurable: ["forms", "defaultForm", "showDescription"],
+    },
+    // CRM Components (distributed in existing categories)
+    {
+      id: "kanban-board",
+      name: "Kanban Board",
+      icon: <Layers className="h-5 w-5" />,
+      category: "datos",
+      description: "Tablero Kanban para pipeline de ventas con drag & drop",
+      configurable: ["tableId", "title", "columns", "allowCreate", "allowEdit", "showValue", "showProbability"],
+    },
+    {
+      id: "contact-card-list",
+      name: "Lista de Contactos",
+      icon: <Users className="h-5 w-5" />,
+      category: "datos",
+      description: "Galería de contactos con búsqueda y filtros",
+      configurable: ["tableId", "title", "allowCreate", "allowEdit", "allowDelete", "defaultView", "showSearch"],
+    },
+    {
+      id: "activity-timeline",
+      name: "Timeline de Actividades",
+      icon: <Activity className="h-5 w-5" />,
+      category: "datos",
+      description: "Timeline cronológico de actividades e interacciones",
+      configurable: ["tableId", "title", "allowCreate", "maxItems", "showRelatedTo", "showAssignedTo"],
+    },
+    {
+      id: "deal-progress",
+      name: "Progreso de Deal",
+      icon: <TrendingUp className="h-5 w-5" />,
+      category: "metricas",
+      description: "Visualización de progreso y detalles de un deal",
+      configurable: ["dealId", "tableId", "title", "showDetails", "allowStageUpdate", "showValue", "showProbability"],
     },
   ]
 
@@ -339,6 +549,18 @@ export default function AdvancedSolutionBuilder() {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [hasUnsavedChanges])
+
+  // Handle resize mouse events
+  useEffect(() => {
+    if (resizingComponent) {
+      window.addEventListener('mousemove', handleResizeMove as any)
+      window.addEventListener('mouseup', handleResizeEnd)
+      return () => {
+        window.removeEventListener('mousemove', handleResizeMove as any)
+        window.removeEventListener('mouseup', handleResizeEnd)
+      }
+    }
+  }, [resizingComponent, resizeStartPos, resizeStartSize])
 
   // Función para obtener componentes iniciales según la plantilla
   const getInitialComponents = (template: string) => {
@@ -607,6 +829,39 @@ export default function AdvancedSolutionBuilder() {
     }
   }
 
+  // Resize functionality
+  const handleResizeStart = (componentId: string, startX: number, startY: number, currentWidth: number, currentHeight: number) => {
+    setResizingComponent(componentId)
+    setResizeStartPos({ x: startX, y: startY })
+    setResizeStartSize({ width: currentWidth, height: currentHeight })
+  }
+
+  const handleResizeMove = (e: MouseEvent) => {
+    if (!resizingComponent) return
+    
+    const deltaX = e.clientX - resizeStartPos.x
+    const deltaY = e.clientY - resizeStartPos.y
+    
+    // Calculate new width (1 column = ~250px)
+    const newWidth = Math.max(1, Math.min(4, resizeStartSize.width + Math.round(deltaX / 250)))
+    const newHeight = Math.max(1, resizeStartSize.height + Math.round(deltaY / 150))
+    
+    setCanvasComponents(prev => 
+      prev.map(comp => 
+        comp.id === resizingComponent 
+          ? { ...comp, size: { width: newWidth, height: newHeight } }
+          : comp
+      )
+    )
+  }
+
+  const handleResizeEnd = () => {
+    if (resizingComponent) {
+      setHasUnsavedChanges(true)
+    }
+    setResizingComponent(null)
+  }
+
   // Save functionality
   const handleSave = async () => {
     if (!solutionId) {
@@ -737,52 +992,7 @@ export default function AdvancedSolutionBuilder() {
         )
 
       case "data-table":
-        const selectedDataSource = dataSources.find(ds => ds.id === component.config.dataSource)
-        const visibleColumns = (component.config.columnConfigs || []).filter((col: any) => col.visible !== false)
-        const displayColumns = visibleColumns.length > 0 
-          ? visibleColumns 
-          : selectedDataSource?.fields.slice(0, 3).map((f: string) => ({ field: f, label: f })) || []
-        
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="text-sm">{component.config.title}</CardTitle>
-              {selectedDataSource && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Fuente: {selectedDataSource.name}
-                </p>
-              )}
-            </CardHeader>
-            <CardContent>
-              {component.config.dataSource && selectedDataSource ? (
-                <UITable>
-                  <TableHeader>
-                    <TableRow>
-                      {displayColumns.slice(0, 4).map((col: any) => (
-                        <TableHead key={col.field} className="text-xs">
-                          {col.label || col.field}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      {displayColumns.slice(0, 4).map((col: any) => (
-                        <TableCell key={col.field} className="text-xs">
-                          <span className="text-muted-foreground">-</span>
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </TableBody>
-                </UITable>
-              ) : (
-                <div className="text-xs text-muted-foreground text-center py-4">
-                  Selecciona una fuente de datos
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )
+        return <DataTablePreview component={component} dataSources={dataSources} />
 
       case "chart-bar":
         return (
@@ -1982,7 +2192,6 @@ export default function AdvancedSolutionBuilder() {
                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
                                   className={`relative group ${snapshot.isDragging ? "z-50" : ""} ${
                                     selectedCanvasComponent === component.id ? "ring-2 ring-primary" : ""
                                   }`}
@@ -1993,13 +2202,56 @@ export default function AdvancedSolutionBuilder() {
                                   }}
                                   onClick={() => setSelectedCanvasComponent(component.id as any)}
                                 >
-                                  <div key={`preview-${component.id}-${JSON.stringify(component.config)}`}>
+                                  {/* Drag Handle - specific area for dragging */}
+                                  {!previewMode && (
+                                    <div 
+                                      {...provided.dragHandleProps}
+                                      className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-move"
+                                    >
+                                      <div className="bg-primary/10 hover:bg-primary/20 rounded p-1">
+                                        <GripVertical className="h-4 w-4 text-primary" />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Preview with resize handles inside */}
+                                  <div key={`preview-${component.id}-${JSON.stringify(component.config)}`} className="h-full w-full relative">
                                     {renderComponentPreview(component)}
+                                    
+                                    {/* Resize handles - positioned on the preview */}
+                                    {!previewMode && (
+                                      <>
+                                        <div
+                                          className="absolute bottom-0 right-0 w-4 h-4 bg-primary cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-br"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            handleResizeStart(component.id, e.clientX, e.clientY, component.size.width, component.size.height)
+                                          }}
+                                        />
+                                        <div
+                                          className="absolute top-1/2 right-0 w-2 h-8 -translate-y-1/2 bg-primary cursor-e-resize opacity-0 group-hover:opacity-100 transition-opacity rounded-l z-10"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            handleResizeStart(component.id, e.clientX, e.clientY, component.size.width, component.size.height)
+                                          }}
+                                        />
+                                        <div
+                                          className="absolute bottom-0 left-1/2 h-2 w-8 -translate-x-1/2 bg-primary cursor-s-resize opacity-0 group-hover:opacity-100 transition-opacity rounded-t z-10"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            handleResizeStart(component.id, e.clientX, e.clientY, component.size.width, component.size.height)
+                                          }}
+                                        />
+                                      </>
+                                    )}
                                   </div>
 
-                                  {/* Controles del componente */}
+                                  {/* Controls - outside the preview but overlaid */}
                                   {!previewMode && (
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                                       <div className="flex gap-1">
                                         <Button
                                           size="sm"
@@ -2142,6 +2394,60 @@ export default function AdvancedSolutionBuilder() {
 
                         <TabsContent value="style" className="mt-4">
                           <div className="space-y-4">
+                            {selectedCanvasComponent && (() => {
+                              const component = canvasComponents.find((comp) => comp.id === selectedCanvasComponent)
+                              if (!component) return null
+                              
+                              return (
+                                <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+                                  <div>
+                                    <Label htmlFor="width">Ancho (columnas)</Label>
+                                    <Select
+                                      value={component.size.width.toString()}
+                                      onValueChange={(val) => {
+                                        setCanvasComponents(prev =>
+                                          prev.map(c => c.id === component.id 
+                                            ? { ...c, size: { ...c.size, width: parseInt(val) } }
+                                            : c
+                                          )
+                                        )
+                                        setHasUnsavedChanges(true)
+                                      }}
+                                    >
+                                      <SelectTrigger id="width">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="1">1 (25%)</SelectItem>
+                                        <SelectItem value="2">2 (50%)</SelectItem>
+                                        <SelectItem value="3">3 (75%)</SelectItem>
+                                        <SelectItem value="4">4 (100%)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="height">Alto (filas)</Label>
+                                    <Input
+                                      id="height"
+                                      type="number"
+                                      min="1"
+                                      max="10"
+                                      value={component.size.height}
+                                      onChange={(e) => {
+                                        setCanvasComponents(prev =>
+                                          prev.map(c => c.id === component.id 
+                                            ? { ...c, size: { ...c.size, height: parseInt(e.target.value) || 1 } }
+                                            : c
+                                          )
+                                        )
+                                        setHasUnsavedChanges(true)
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            })()}
+
                             <div>
                               <Label htmlFor="theme">Tema</Label>
                               <Select defaultValue="light">
