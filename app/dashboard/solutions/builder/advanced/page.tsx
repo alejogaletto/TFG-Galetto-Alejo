@@ -164,14 +164,14 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto p-0">
-        {component.config.dataSource && selectedDataSource ? (
+        {component.config.columns && component.config.columns.length > 0 ? (
           <div className="max-h-[400px] overflow-auto">
             <UITable>
               <TableHeader className="sticky top-0 bg-background">
                 <TableRow>
-                  {displayColumns.map((col: any) => (
-                    <TableHead key={col.field || col.name} className="text-xs">
-                      {col.label || col.name}
+                  {component.config.columns.map((col: any, idx: number) => (
+                    <TableHead key={idx} className="text-xs font-medium">
+                      {typeof col === 'string' ? col : col.label || col.key}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -180,26 +180,39 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
                 {data.length > 0 ? (
                   data.map((row) => (
                     <TableRow key={row.id}>
-                      {displayColumns.map((col: any) => (
-                        <TableCell key={col.field || col.name} className="text-xs">
-                          {row.data_json?.[col.field || col.name]?.toString() || '-'}
+                      {component.config.columns.map((col: any, idx: number) => {
+                        const colKey = typeof col === 'string' ? col : col.key
+                        return (
+                          <TableCell key={idx} className="text-xs">
+                            {row.data_json?.[colKey]?.toString() || '-'}
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  ))
+                ) : (
+                  // Show skeleton preview rows
+                  [1, 2, 3].map((i) => (
+                    <TableRow key={i}>
+                      {component.config.columns.map((col: any, idx: number) => (
+                        <TableCell key={idx} className="text-xs">
+                          <div className="h-4 bg-muted rounded w-full animate-pulse"></div>
                         </TableCell>
                       ))}
                     </TableRow>
                   ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={displayColumns.length} className="text-center text-xs text-muted-foreground">
-                      No hay datos disponibles
-                    </TableCell>
-                  </TableRow>
                 )}
               </TableBody>
             </UITable>
+            {data.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-2 border-t">
+                Vista previa - {component.config.columns.length} columnas configuradas
+              </div>
+            )}
           </div>
         ) : (
-          <div className="text-xs text-muted-foreground text-center py-4">
-            Selecciona una fuente de datos en la configuración
+          <div className="text-xs text-muted-foreground text-center py-8">
+            Configura columnas en la pestaña de configuración
           </div>
         )}
       </CardContent>
@@ -441,6 +454,7 @@ export default function AdvancedSolutionBuilder() {
         const schemasRes = await fetch(`/api/virtual-schemas?user_id=${currentUserId}&includeTree=true`)
         if (schemasRes.ok) {
           const schemas = await schemasRes.json()
+          console.log('📊 Fetched schemas:', schemas)
           
           // Transform to dataSources format
           const sources = schemas.flatMap((schema: any) => 
@@ -454,6 +468,7 @@ export default function AdvancedSolutionBuilder() {
               description: table.description || schema.name
             }))
           )
+          console.log('📊 Transformed dataSources:', sources)
           setDataSources(sources)
         }
 
@@ -1291,6 +1306,64 @@ export default function AdvancedSolutionBuilder() {
           </Card>
         )
 
+      case "activity-timeline":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title || "Timeline de Actividades"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { icon: '📞', type: 'Llamada', color: 'bg-blue-100 text-blue-600' },
+                  { icon: '✉️', type: 'Email', color: 'bg-purple-100 text-purple-600' },
+                  { icon: '👥', type: 'Reunión', color: 'bg-green-100 text-green-600' }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-start">
+                    <div className={`${item.color} w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0`}>
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <div className="h-3 bg-muted rounded w-3/4 animate-pulse"></div>
+                      <div className="h-2 bg-muted rounded w-1/2 animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+                <div className="text-xs text-muted-foreground text-center pt-2 border-t">
+                  Vista previa - {component.config.maxItems || 10} actividades
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )
+
+      case "contact-card-list":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title || "Lista de Contactos"}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="border rounded p-2 flex gap-2 hover:bg-muted/50 transition-colors">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex-shrink-0"></div>
+                      <div className="flex-1 space-y-1 min-w-0">
+                        <div className="h-3 bg-muted rounded w-full animate-pulse"></div>
+                        <div className="h-2 bg-muted rounded w-2/3 animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-muted-foreground text-center pt-2 border-t">
+                  Vista {component.config.defaultView || 'grid'} - Configura fuente de datos
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )
+
       default:
         return (
           <Card className="h-full">
@@ -1368,6 +1441,91 @@ export default function AdvancedSolutionBuilder() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Information Display - Show what data is being shown */}
+        {(config.tableId || config.dataSource) && (() => {
+          // Try to find the table name
+          let tableSource = null
+          let tableName = 'Cargando...'
+          
+          if (dataSources.length > 0) {
+            const byTableId = dataSources.find(ds => ds.tableId === config.tableId)
+            const byDataSource = dataSources.find(ds => ds.id === config.dataSource)
+            const byId = dataSources.find(ds => ds.id === `table-${config.tableId}`)
+            tableSource = byTableId || byDataSource || byId
+            
+            if (tableSource) {
+              tableName = tableSource.name
+            } else if (config.tableId) {
+              // Fallback: show table ID if we can't find the name
+              tableName = `Tabla ID: ${config.tableId}`
+            }
+          } else if (config.tableId) {
+            tableName = `Tabla ID: ${config.tableId}`
+          }
+          
+          return (
+            <div className="rounded-md bg-muted p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Database className="h-4 w-4" />
+                <span>Información de Datos</span>
+              </div>
+              
+              {/* Show table name */}
+              <div className="text-xs">
+                <span className="text-muted-foreground">Tabla:</span>{' '}
+                <span className="font-medium">{tableName}</span>
+              </div>
+            
+            {/* Component-specific field display */}
+            {component.type === 'stat-card' && (
+              <p className="text-xs text-muted-foreground">
+                Muestra el conteo total de registros en esta tabla
+              </p>
+            )}
+            
+            {component.type === 'data-table' && config.columns && (
+              <div className="text-xs space-y-1">
+                <span className="text-muted-foreground">Columnas mostradas:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {config.columns.map((col: any, idx: number) => {
+                    const label = typeof col === 'string' ? col : col.label
+                    return (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {label}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {component.type === 'activity-timeline' && (
+              <div className="text-xs space-y-1">
+                <p className="text-muted-foreground">
+                  Muestra: tipo de actividad, descripción, fecha, estado, persona asignada
+                </p>
+                {config.maxItems && (
+                  <p className="text-muted-foreground">
+                    Límite: {config.maxItems} actividades recientes
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {component.type === 'contact-card-list' && (
+              <div className="text-xs space-y-1">
+                <p className="text-muted-foreground">
+                  Muestra: nombre, empresa, email, teléfono, estado, tags
+                </p>
+                <p className="text-muted-foreground">
+                  Vista: {config.defaultView === 'grid' ? 'Cuadrícula' : 'Lista'}
+                </p>
+              </div>
+            )}
+          </div>
+        )
+        })()}
 
         {/* Workflow selector for automation components */}
         {component.type === "workflow-trigger" && (
@@ -1716,6 +1874,143 @@ export default function AdvancedSolutionBuilder() {
                 <Label htmlFor="allow-delete" className="text-xs">Permitir Eliminar</Label>
               </div>
             </div>
+
+            {/* Stage Colors Configuration - Visual Editor */}
+            {config.columns && (
+              (() => {
+                // Find if any column has stageColors
+                const stageColumn = config.columns.find((col: any) => 
+                  typeof col === 'object' && col.stageColors
+                )
+                
+                if (!stageColumn) return null
+                
+                const stageColors = stageColumn.stageColors || {}
+                const stages = Object.keys(stageColors)
+                
+                return (
+                  <div className="space-y-3">
+                    <Separator />
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm">Etapa - Badges Personalizables</Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Configura los colores y etiquetas para cada etapa del pipeline
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {stages.map((stageKey) => {
+                        const stageConfig = stageColors[stageKey]
+                        const colorOptions = [
+                          { value: 'blue', label: 'Azul', class: 'bg-blue-100 text-blue-800' },
+                          { value: 'purple', label: 'Morado', class: 'bg-purple-100 text-purple-800' },
+                          { value: 'yellow', label: 'Amarillo', class: 'bg-yellow-100 text-yellow-800' },
+                          { value: 'orange', label: 'Naranja', class: 'bg-orange-100 text-orange-800' },
+                          { value: 'green', label: 'Verde', class: 'bg-green-100 text-green-800' },
+                          { value: 'red', label: 'Rojo', class: 'bg-red-100 text-red-800' },
+                          { value: 'gray', label: 'Gris', class: 'bg-gray-100 text-gray-800' },
+                        ]
+                        
+                        return (
+                          <Card key={stageKey} className="p-3">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium capitalize">
+                                  {stageKey.replace('_', ' ')}
+                                </span>
+                                <Badge className={
+                                  colorOptions.find(opt => opt.value === stageConfig.color)?.class || 
+                                  'bg-gray-100 text-gray-800'
+                                }>
+                                  {stageConfig.label}
+                                </Badge>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label className="text-xs">Etiqueta</Label>
+                                  <Input
+                                    value={stageConfig.label || ''}
+                                    onChange={(e) => {
+                                      const updatedColumns = config.columns.map((col: any) => {
+                                        if (col.key === stageColumn.key) {
+                                          return {
+                                            ...col,
+                                            stageColors: {
+                                              ...col.stageColors,
+                                              [stageKey]: {
+                                                ...stageConfig,
+                                                label: e.target.value
+                                              }
+                                            }
+                                          }
+                                        }
+                                        return col
+                                      })
+                                      updateComponentConfig(component.id, { columns: updatedColumns })
+                                    }}
+                                    className="h-8 text-xs"
+                                    placeholder="Nombre de etapa"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label className="text-xs">Color</Label>
+                                  <Select
+                                    value={stageConfig.color || 'gray'}
+                                    onValueChange={(color) => {
+                                      const updatedColumns = config.columns.map((col: any) => {
+                                        if (col.key === stageColumn.key) {
+                                          return {
+                                            ...col,
+                                            stageColors: {
+                                              ...col.stageColors,
+                                              [stageKey]: {
+                                                ...stageConfig,
+                                                color: color
+                                              }
+                                            }
+                                          }
+                                        }
+                                        return col
+                                      })
+                                      updateComponentConfig(component.id, { columns: updatedColumns })
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {colorOptions.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                          <div className="flex items-center gap-2">
+                                            <div className={`w-3 h-3 rounded ${opt.class}`}></div>
+                                            <span>{opt.label}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                    
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-950 p-2">
+                      <p className="text-xs text-blue-800 dark:text-blue-300">
+                        💡 Los cambios se aplican en tiempo real. Los usuarios verán badges con estos colores en la tabla.
+                      </p>
+                    </div>
+                  </div>
+                )
+              })()
+            )}
           </div>
         )}
 
