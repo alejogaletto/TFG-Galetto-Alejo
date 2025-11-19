@@ -46,10 +46,14 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SolutionDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { toast } = useToast()
   const solutionId = params?.id
 
   // Dynamic solution state
@@ -57,6 +61,11 @@ export default function SolutionDetailPage() {
   const [canvasComponents, setCanvasComponents] = useState<any[]>([])
   const [componentsData, setComponentsData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
+  const [updatingRow, setUpdatingRow] = useState<string | null>(null)
+  const [forms, setForms] = useState<any[]>([])
+  const [formFields, setFormFields] = useState<Record<number, any[]>>({})
+  const [formData, setFormData] = useState<Record<string, Record<string, any>>>({})
+  const [isSubmitting, setIsSubmitting] = useState<string | null>(null)
 
   // Actualizar la función formatCurrency para usar pesos argentinos
   const formatCurrency = (amount: number) => {
@@ -98,6 +107,28 @@ export default function SolutionDetailPage() {
           // Fetch actual data for each component
           await fetchComponentsData(data.configs.canvas)
         }
+
+        // Fetch Forms
+        const formsRes = await fetch('/api/forms')
+        if (formsRes.ok) {
+          const formsData = await formsRes.json()
+          setForms(formsData || [])
+          
+          // Fetch fields for each form
+          const fieldsMap: Record<number, any[]> = {}
+          for (const form of formsData || []) {
+            try {
+              const fieldsRes = await fetch(`/api/form-fields?form_id=${form.id}`)
+              if (fieldsRes.ok) {
+                const fields = await fieldsRes.json()
+                fieldsMap[form.id] = fields || []
+              }
+            } catch (err) {
+              console.error(`Error fetching fields for form ${form.id}:`, err)
+            }
+          }
+          setFormFields(fieldsMap)
+        }
       } catch (error) {
         console.error('Error loading solution:', error)
       } finally {
@@ -113,10 +144,19 @@ export default function SolutionDetailPage() {
     const dataMap: Record<string, any> = {}
 
     for (const component of components) {
-      if (component.config.tableId) {
+      // Determine tableId from config or dataSource
+      let tableId = component.config.tableId
+      
+      if (!tableId && component.config.dataSource && typeof component.config.dataSource === 'string') {
+        if (component.config.dataSource.startsWith('table-')) {
+          tableId = parseInt(component.config.dataSource.replace('table-', ''), 10)
+        }
+      }
+
+      if (tableId) {
         try {
           // Fetch from BusinessData
-          const res = await fetch(`/api/business-data?virtual_table_schema_id=${component.config.tableId}`)
+          const res = await fetch(`/api/business-data?virtual_table_schema_id=${tableId}`)
           if (res.ok) {
             const data = await res.json()
             dataMap[component.id] = data
@@ -128,6 +168,65 @@ export default function SolutionDetailPage() {
     }
 
     setComponentsData(dataMap)
+  }
+
+  const handleUpdateData = async (componentId: string, rowId: number, field: string, newValue: any) => {
+    const updateKey = `${rowId}-${field}`
+    setUpdatingRow(updateKey)
+
+    // Optimistic update
+    const previousData = { ...componentsData }
+    const componentData = [...(previousData[componentId] || [])]
+    const rowIndex = componentData.findIndex((r: any) => r.id === rowId)
+    
+    if (rowIndex !== -1) {
+      const currentRow = componentData[rowIndex]
+      const updatedRow = {
+        ...currentRow,
+        data_json: {
+          ...currentRow.data_json,
+          [field]: newValue
+        }
+      }
+      
+      componentData[rowIndex] = updatedRow
+      setComponentsData({
+        ...componentsData,
+        [componentId]: componentData
+      })
+
+      try {
+        const response = await fetch(`/api/business-data/${rowId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data_json: updatedRow.data_json
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Error updating data')
+        }
+
+        toast({
+          title: "Dato actualizado",
+          description: "El registro se ha guardado correctamente.",
+        })
+      } catch (error) {
+        // Revert on error
+        console.error('Error updating data:', error)
+        setComponentsData(previousData)
+        toast({
+          title: "Error",
+          description: "No se pudo actualizar el registro. Inténtalo de nuevo.",
+          variant: "destructive",
+        })
+      } finally {
+        setUpdatingRow(null)
+      }
+    }
   }
 
   // Remove hardcoded demo data - solutions should load their own data
@@ -259,6 +358,18 @@ export default function SolutionDetailPage() {
         )
 
       case "data-table":
+        // Normalize columns from either columns (legacy/view) or columnConfigs (builder)
+        const rawColumns = component.config.columns || component.config.columnConfigs || []
+        const columns = rawColumns.map((col: any) => {
+          if (typeof col === 'string') return { key: col, label: col, field: col }
+          return {
+            ...col,
+            key: col.key || col.field,
+            label: col.label || col.key || col.field,
+            field: col.field || col.key
+          }
+        }).filter((col: any) => col.visible !== false)
+
         return (
           <Card>
             <CardHeader>
@@ -268,45 +379,135 @@ export default function SolutionDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    {component.config.columns?.map((col: any) => {
-                      const colKey = typeof col === 'string' ? col : col.key
-                      const colLabel = typeof col === 'string' ? col : col.label || col.key
-                      return <TableHead key={colKey}>{colLabel}</TableHead>
-                    })}
+                    {columns.map((col: any) => (
+                      <TableHead key={col.key}>{col.label}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(data || []).slice(0, 10).map((row: any, idx: number) => (
                     <TableRow key={idx}>
-                      {component.config.columns?.map((col: any) => {
-                        const colKey = typeof col === 'string' ? col : col.key
-                        const value = row.data_json?.[colKey]
-                        const format = typeof col === 'object' ? col.format : null
-                        const colType = typeof col === 'object' ? col.type : null
-                        const stageColors = typeof col === 'object' ? col.stageColors : null
+                      {columns.map((col: any) => {
+                        const value = row.data_json?.[col.field]
+                        const format = col.format
+                        const colType = col.type
+                        const stageColors = col.stageColors
                         
                         let displayValue = value || '-'
                         
                         // Badge rendering for stage column
-                        if (colType === 'badge' && stageColors && value) {
-                          const stageConfig = stageColors[value]
-                          if (stageConfig) {
-                            const colorMap: Record<string, string> = {
-                              blue: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-                              purple: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
-                              yellow: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
-                              orange: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
-                              green: 'bg-green-100 text-green-800 hover:bg-green-100',
-                              red: 'bg-red-100 text-red-800 hover:bg-red-100',
+                        if (colType === 'badge') {
+                          // Priority 1: Check for options array (new builder config)
+                          if (col.options && Array.isArray(col.options)) {
+                            const option = col.options.find((opt: any) => String(opt.value) === String(value))
+                            
+                            // If editable and we have options, render a Select (Dropdown) for editing
+                            if (col.editable) {
+                              return (
+                                <TableCell key={col.key}>
+                                  <Select
+                                    value={value?.toString() || ''}
+                                    onValueChange={(newValue) => handleUpdateData(component.id, row.id, col.field, newValue)}
+                                    disabled={updatingRow === `${row.id}-${col.field}`}
+                                  >
+                                    <SelectTrigger className={`h-8 w-full min-w-[120px] ${option ? '' : 'text-muted-foreground'}`}>
+                                      {option ? (
+                                        <div className="flex items-center gap-2">
+                                          <div className={`w-2 h-2 rounded-full bg-${option.color === 'gray' ? 'gray-500' : `${option.color}-500`}`} />
+                                          <span className="truncate">{option.label}</span>
+                                        </div>
+                                      ) : (
+                                        // Show value even if no option matches, or placeholder if empty
+                                        <span className="truncate">{value || 'Seleccionar...'}</span>
+                                      )}
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {col.options.map((opt: any, optIdx: number) => (
+                                        <SelectItem key={optIdx} value={opt.value?.toString() || ''}>
+                                          <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full bg-${opt.color === 'gray' ? 'gray-500' : `${opt.color}-500`}`} />
+                                            <span>{opt.label}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                              )
                             }
-                            return (
-                              <TableCell key={colKey}>
-                                <Badge className={colorMap[stageConfig.color] || 'bg-gray-100 text-gray-800'}>
-                                  {stageConfig.label}
-                                </Badge>
-                              </TableCell>
-                            )
+
+                            // Read-only badge view
+                            if (option) {
+                              const colorMap: Record<string, string> = {
+                                blue: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+                                purple: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
+                                yellow: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
+                                orange: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
+                                green: 'bg-green-100 text-green-800 hover:bg-green-100',
+                                red: 'bg-red-100 text-red-800 hover:bg-red-100',
+                                gray: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+                              }
+                              return (
+                                <TableCell key={col.key}>
+                                  <Badge className={colorMap[option.color] || 'bg-gray-100 text-gray-800'}>
+                                    {option.label}
+                                  </Badge>
+                                </TableCell>
+                              )
+                            }
                           }
+                          
+                          // Priority 2: Legacy stageColors map
+                          if (stageColors && value) {
+                            const stageConfig = stageColors[value]
+                            if (stageConfig) {
+                              const colorMap: Record<string, string> = {
+                                blue: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+                                purple: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
+                                yellow: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
+                                orange: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
+                                green: 'bg-green-100 text-green-800 hover:bg-green-100',
+                                red: 'bg-red-100 text-red-800 hover:bg-red-100',
+                              }
+                              return (
+                                <TableCell key={col.key}>
+                                  <Badge className={colorMap[stageConfig.color] || 'bg-gray-100 text-gray-800'}>
+                                    {stageConfig.label}
+                                  </Badge>
+                                </TableCell>
+                              )
+                            }
+                          }
+                        }
+
+                        // Dropdown rendering for editable dropdown columns
+                        if (colType === 'dropdown' && col.options && Array.isArray(col.options) && col.editable) {
+                          const option = col.options.find((opt: any) => String(opt.value) === String(value))
+                          
+                          return (
+                            <TableCell key={col.key}>
+                              <Select
+                                value={value?.toString() || ''}
+                                onValueChange={(newValue) => handleUpdateData(component.id, row.id, col.field, newValue)}
+                                disabled={updatingRow === `${row.id}-${col.field}`}
+                              >
+                                <SelectTrigger className="h-8 w-full min-w-[120px]">
+                                  {option ? (
+                                    <span className="truncate">{option.label}</span>
+                                  ) : (
+                                    <span className="truncate">{value || 'Seleccionar...'}</span>
+                                  )}
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {col.options.map((opt: any, optIdx: number) => (
+                                    <SelectItem key={optIdx} value={opt.value?.toString() || ''}>
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          )
                         }
                         
                         // Currency formatting
@@ -323,7 +524,7 @@ export default function SolutionDetailPage() {
                         }
                         
                         return (
-                          <TableCell key={colKey}>
+                          <TableCell key={col.key}>
                             {displayValue}
                           </TableCell>
                         )
@@ -531,6 +732,113 @@ export default function SolutionDetailPage() {
                       </div>
                     )
                   })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+
+      case "form-embed":
+        const selectedForm = forms.find(f => f.id === component.config.formId)
+        const selectedFormFields = component.config.formId ? formFields[component.config.formId] || [] : []
+        const componentFormData = formData[component.id] || {}
+
+        const handleFormSubmit = async (e: React.FormEvent) => {
+          e.preventDefault()
+          setIsSubmitting(component.id)
+
+          try {
+            const response = await fetch('/api/form-submissions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                form_id: component.config.formId,
+                data: componentFormData,
+              }),
+            })
+
+            if (response.ok) {
+              toast({
+                title: "Éxito",
+                description: "Formulario enviado correctamente",
+              })
+              // Clear form
+              setFormData({
+                ...formData,
+                [component.id]: {}
+              })
+            } else {
+              throw new Error('Error al enviar el formulario')
+            }
+          } catch (error) {
+            console.error('Error submitting form:', error)
+            toast({
+              title: "Error",
+              description: "No se pudo enviar el formulario",
+              variant: "destructive",
+            })
+          } finally {
+            setIsSubmitting(null)
+          }
+        }
+
+        const handleFieldChange = (fieldName: string, value: string) => {
+          setFormData({
+            ...formData,
+            [component.id]: {
+              ...componentFormData,
+              [fieldName]: value
+            }
+          })
+        }
+
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-sm">{component.config.title || "Formulario"}</CardTitle>
+              {selectedForm && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Formulario: {selectedForm.name}
+                </p>
+              )}
+            </CardHeader>
+            <CardContent>
+              {component.config.formId && selectedForm ? (
+                <form onSubmit={handleFormSubmit} className="space-y-3">
+                  {selectedFormFields.length > 0 ? (
+                    <>
+                      {selectedFormFields.map((field: any) => (
+                        <div key={field.id}>
+                          <Label className="text-xs">{field.label}</Label>
+                          <Input 
+                            placeholder={field.configs?.placeholder || ''} 
+                            className="h-8"
+                            value={componentFormData[field.field_name] || ''}
+                            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
+                            required={field.configs?.required}
+                          />
+                        </div>
+                      ))}
+                      <Button 
+                        type="submit" 
+                        size="sm" 
+                        className="w-full h-8"
+                        disabled={isSubmitting === component.id}
+                      >
+                        {isSubmitting === component.id ? "Enviando..." : (component.config.submitButtonText || "Enviar")}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="text-xs text-muted-foreground text-center py-4">
+                      Este formulario no tiene campos configurados
+                    </div>
+                  )}
+                </form>
+              ) : (
+                <div className="text-xs text-muted-foreground text-center py-4">
+                  Selecciona un formulario en la configuración
                 </div>
               )}
             </CardContent>

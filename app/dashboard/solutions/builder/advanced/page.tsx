@@ -70,13 +70,24 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [newRowData, setNewRowData] = useState<any>({})
   
-  const selectedDataSource = dataSources.find(ds => ds.id === component.config.dataSource)
-  const tableId = component.config.dataSource?.replace('table-', '')
+  const selectedDataSource =
+    dataSources.find(ds => ds.id === component.config.dataSource) ||
+    dataSources.find(ds => ds.tableId === component.config.tableId)
+
+  const derivedTableId =
+    component.config.tableId ??
+    (component.config.dataSource?.startsWith('table-')
+      ? parseInt(component.config.dataSource.replace('table-', ''), 10)
+      : undefined)
+
+  const tableId = Number.isFinite(derivedTableId) ? derivedTableId : undefined
+  const columnConfigs = component.config.columnConfigs || []
+  const visibleColumns = columnConfigs.filter((col: any) => col.visible !== false)
   
   useEffect(() => {
     fetchData()
     fetchFields()
-  }, [component.config.dataSource])
+  }, [tableId])
   
   const fetchData = async () => {
     if (!tableId) {
@@ -132,9 +143,6 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
     }
   }
   
-  const visibleColumns = (component.config.columnConfigs || []).filter((col: any) => col.visible !== false)
-  const displayColumns = visibleColumns.length > 0 ? visibleColumns : fields
-  
   if (loading) {
     return (
       <Card className="h-full">
@@ -164,14 +172,14 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto p-0">
-        {component.config.columns && component.config.columns.length > 0 ? (
+        {visibleColumns.length > 0 ? (
           <div className="max-h-[400px] overflow-auto">
             <UITable>
               <TableHeader className="sticky top-0 bg-background">
                 <TableRow>
-                  {component.config.columns.map((col: any, idx: number) => (
-                    <TableHead key={idx} className="text-xs font-medium">
-                      {typeof col === 'string' ? col : col.label || col.key}
+                  {visibleColumns.map((col: any) => (
+                    <TableHead key={col.field} className="text-xs font-medium">
+                      {col.label || col.field}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -180,22 +188,19 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
                 {data.length > 0 ? (
                   data.map((row) => (
                     <TableRow key={row.id}>
-                      {component.config.columns.map((col: any, idx: number) => {
-                        const colKey = typeof col === 'string' ? col : col.key
-                        return (
-                          <TableCell key={idx} className="text-xs">
-                            {row.data_json?.[colKey]?.toString() || '-'}
-                          </TableCell>
-                        )
-                      })}
+                      {visibleColumns.map((col: any) => (
+                        <TableCell key={col.field} className="text-xs">
+                          {row.data_json?.[col.field]?.toString() || '-'}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))
                 ) : (
                   // Show skeleton preview rows
                   [1, 2, 3].map((i) => (
                     <TableRow key={i}>
-                      {component.config.columns.map((col: any, idx: number) => (
-                        <TableCell key={idx} className="text-xs">
+                      {visibleColumns.map((col: any) => (
+                        <TableCell key={col.field} className="text-xs">
                           <div className="h-4 bg-muted rounded w-full animate-pulse"></div>
                         </TableCell>
                       ))}
@@ -206,7 +211,7 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
             </UITable>
             {data.length === 0 && (
               <div className="text-xs text-muted-foreground text-center py-2 border-t">
-                Vista previa - {component.config.columns.length} columnas configuradas
+                Vista previa - {visibleColumns.length} columnas configuradas
               </div>
             )}
           </div>
@@ -224,16 +229,20 @@ function DataTablePreview({ component, dataSources }: { component: any, dataSour
             <DialogTitle>Agregar Fila</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            {fields.map((field) => (
-              <div key={field.id}>
-                <Label className="text-xs">{field.name}</Label>
-                <Input
-                  value={newRowData[field.name] || ''}
-                  onChange={(e) => setNewRowData({ ...newRowData, [field.name]: e.target.value })}
-                  className="h-8"
-                />
-              </div>
-            ))}
+            {(visibleColumns.length > 0 ? visibleColumns : fields).map((field: any) => {
+              const fieldKey = field.field || field.name
+              const fieldLabel = field.label || field.name || field.field
+              return (
+                <div key={fieldKey}>
+                  <Label className="text-xs">{fieldLabel}</Label>
+                  <Input
+                    value={newRowData[fieldKey] || ''}
+                    onChange={(e) => setNewRowData({ ...newRowData, [fieldKey]: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+              )
+            })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
@@ -264,6 +273,7 @@ export default function AdvancedSolutionBuilder() {
   const [lastSavedState, setLastSavedState] = useState<string>("")
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [resizingComponent, setResizingComponent] = useState<string | null>(null)
   const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 })
   const [resizeStartSize, setResizeStartSize] = useState({ width: 1, height: 1 })
@@ -794,6 +804,37 @@ export default function AdvancedSolutionBuilder() {
       })
     }
 
+    // Handle column reordering within data-table configuration
+    if (source.droppableId.startsWith("column-config-") && source.droppableId === destination.droppableId) {
+      const componentId = source.droppableId.replace("column-config-", "")
+      const component = canvasComponents.find(c => c.id === componentId)
+      
+      if (component) {
+        const selectedDataSource = dataSources.find((ds) => ds.id === component.config.dataSource)
+        const allFields = selectedDataSource?.fields || []
+        const existingConfigs = component.config.columnConfigs || []
+        
+        // Create ordered list
+        const configuredFields = existingConfigs.map((c: any) => c.field)
+        const newFields = allFields.filter((f: string) => !configuredFields.includes(f))
+        const orderedFields = [...configuredFields.filter((f: string) => allFields.includes(f)), ...newFields]
+        
+        // Reorder the fields
+        const reorderedFields = Array.from(orderedFields)
+        const [movedField] = reorderedFields.splice(source.index, 1)
+        reorderedFields.splice(destination.index, 0, movedField)
+        
+        // Rebuild columnConfigs in the new order
+        const newColumnConfigs = reorderedFields.map(field => {
+          const existing = existingConfigs.find((c: any) => c.field === field)
+          return existing || { field, label: field, type: 'text', editable: false, visible: true }
+        })
+        
+        updateComponentConfig(componentId, { columnConfigs: newColumnConfigs })
+      }
+      return
+    }
+
     // Si se reordena dentro del canvas
     if (source.droppableId === "canvas" && destination.droppableId === "canvas") {
       console.log("Reordering within canvas")
@@ -888,6 +929,7 @@ export default function AdvancedSolutionBuilder() {
       return
     }
 
+    setIsSaving(true)
     try {
       // 1. Save canvas layout to Solution.configs
       const layoutConfig = {
@@ -957,6 +999,8 @@ export default function AdvancedSolutionBuilder() {
         description: "Error al guardar la solución",
         variant: "destructive",
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -1426,10 +1470,7 @@ export default function AdvancedSolutionBuilder() {
                   <SelectItem key={source.id} value={source.id}>
                     <div className="flex items-center gap-2">
                       <Database className="h-4 w-4" />
-                      <div>
-                        <div className="font-medium">{source.name}</div>
-                        <div className="text-xs text-muted-foreground">{source.description}</div>
-                      </div>
+                      <span>{source.name}</span>
                     </div>
                   </SelectItem>
                 ))
@@ -1675,38 +1716,61 @@ export default function AdvancedSolutionBuilder() {
             <div>
               <Label>Configuración de Columnas</Label>
               <p className="text-xs text-muted-foreground mb-2">
-                Configura las columnas que se mostrarán en la tabla
+                Configura las columnas que se mostrarán en la tabla. Arrastra para reordenar.
               </p>
-              <div className="space-y-3 mt-2">
-                {dataSources
-                  .find((ds) => ds.id === config.dataSource)
-                  ?.fields.map((field: string) => {
-                    const columnConfig = (config.columnConfigs || []).find(
-                      (col: any) => col.field === field
-                    ) || { field, label: field, type: 'text', editable: false, visible: true }
-                    
-                    return (
-                      <Card key={field} className="p-3">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Switch
-                                key={`visible-${field}-${component.id}`}
-                                id={`visible-${field}`}
-                                checked={columnConfig.visible !== false}
-                                onCheckedChange={(checked) => {
-                                  const configs = config.columnConfigs || []
-                                  const otherConfigs = configs.filter((c: any) => c.field !== field)
-                                  updateComponentConfig(component.id, { 
-                                    columnConfigs: [...otherConfigs, { ...columnConfig, visible: checked }]
-                                  })
-                                }}
-                              />
-                              <Label htmlFor={`visible-${field}`} className="capitalize font-medium text-sm">
-                                {field.replace("_", " ")}
-                              </Label>
-                            </div>
-                          </div>
+              <Droppable droppableId={`column-config-${component.id}`}>
+                {(provided) => {
+                  const selectedDataSource = dataSources.find((ds) => ds.id === config.dataSource)
+                  const allFields = selectedDataSource?.fields || []
+                  
+                  // Create ordered list: first use existing columnConfigs order, then append any new fields
+                  const existingConfigs = config.columnConfigs || []
+                  const configuredFields = existingConfigs.map((c: any) => c.field)
+                  const newFields = allFields.filter((f: string) => !configuredFields.includes(f))
+                  const orderedFields = [...configuredFields.filter((f: string) => allFields.includes(f)), ...newFields]
+                  
+                  return (
+                    <div 
+                      className="space-y-3 mt-2"
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                    >
+                      {orderedFields.map((field: string, index: number) => {
+                        const columnConfig = existingConfigs.find(
+                          (col: any) => col.field === field
+                        ) || { field, label: field, type: 'text', editable: false, visible: true }
+                        
+                        return (
+                          <Draggable key={field} draggableId={`column-${component.id}-${field}`} index={index}>
+                            {(provided, snapshot) => (
+                              <Card 
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`p-3 ${snapshot.isDragging ? 'shadow-lg' : ''}`}
+                              >
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                      </div>
+                                      <Switch
+                                        key={`visible-${field}-${component.id}`}
+                                        id={`visible-${field}`}
+                                        checked={columnConfig.visible !== false}
+                                        onCheckedChange={(checked) => {
+                                          const configs = config.columnConfigs || []
+                                          const otherConfigs = configs.filter((c: any) => c.field !== field)
+                                          updateComponentConfig(component.id, { 
+                                            columnConfigs: [...otherConfigs, { ...columnConfig, visible: checked }]
+                                          })
+                                        }}
+                                      />
+                                      <Label htmlFor={`visible-${field}`} className="capitalize font-medium text-sm">
+                                        {field.replace("_", " ")}
+                                      </Label>
+                                    </div>
+                                  </div>
                           
                           {columnConfig.visible !== false && (
                             <>
@@ -1732,6 +1796,7 @@ export default function AdvancedSolutionBuilder() {
                                       <SelectItem value="number">Número</SelectItem>
                                       <SelectItem value="date">Fecha</SelectItem>
                                       <SelectItem value="dropdown">Dropdown</SelectItem>
+                                      <SelectItem value="badge">Badge (Etiqueta)</SelectItem>
                                       <SelectItem value="boolean">Booleano</SelectItem>
                                     </SelectContent>
                                   </Select>
@@ -1753,21 +1818,24 @@ export default function AdvancedSolutionBuilder() {
                                 </div>
                               </div>
 
-                              {columnConfig.type === 'dropdown' && (
+                              {(columnConfig.type === 'dropdown' || columnConfig.type === 'badge') && (
                                 <div>
-                                  <Label className="text-xs">Opciones del Dropdown</Label>
+                                  <Label className="text-xs">
+                                    {columnConfig.type === 'badge' ? 'Configuración de Badges' : 'Opciones del Dropdown'}
+                                  </Label>
                                   <div className="space-y-1 mt-1">
                                     {(columnConfig.options || []).map((opt: any, idx: number) => (
                                       <div key={idx} className="flex items-center gap-1">
                                         <Input 
                                           value={opt.label} 
                                           className="h-6 text-xs flex-1"
-                                          placeholder="Etiqueta"
+                                          placeholder="Valor/Etiqueta"
                                           onChange={(e) => {
                                             const configs = config.columnConfigs || []
                                             const otherConfigs = configs.filter((c: any) => c.field !== field)
                                             const newOptions = [...(columnConfig.options || [])]
-                                            newOptions[idx] = { ...opt, label: e.target.value, value: e.target.value.toLowerCase() }
+                                            // Use exact value for matching, no toLowerCase()
+                                            newOptions[idx] = { ...opt, label: e.target.value, value: e.target.value }
                                             updateComponentConfig(component.id, { 
                                               columnConfigs: [...otherConfigs, { ...columnConfig, options: newOptions }]
                                             })
@@ -1795,6 +1863,7 @@ export default function AdvancedSolutionBuilder() {
                                             <SelectItem value="green">Verde</SelectItem>
                                             <SelectItem value="blue">Azul</SelectItem>
                                             <SelectItem value="purple">Morado</SelectItem>
+                                            <SelectItem value="orange">Naranja</SelectItem>
                                           </SelectContent>
                                         </Select>
                                         <Button 
@@ -1832,15 +1901,21 @@ export default function AdvancedSolutionBuilder() {
                                     </Button>
                                   </div>
                                 </div>
+                                  )}
+                                </>
                               )}
-                            </>
-                          )}
-                        </div>
-                      </Card>
+                            </div>
+                          </Card>
+                        )}
+                      </Draggable>
                     )
                   })}
-              </div>
-            </div>
+                  {provided.placeholder}
+                </div>
+              )
+            }}
+          </Droppable>
+        </div>
 
             <Separator />
 
@@ -2074,7 +2149,7 @@ export default function AdvancedSolutionBuilder() {
       {/* Header Principal */}
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
         <Link className="flex items-center gap-2 font-semibold" href="#">
-          <span className="font-bold">AutomateSMB</span>
+          <span className="font-bold">AutomatePyme</span>
         </Link>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
@@ -2215,9 +2290,18 @@ export default function AdvancedSolutionBuilder() {
                 <Eye className="mr-2 h-4 w-4" />
                 {previewMode ? "Editar" : "Vista Previa"}
               </Button>
-              <Button size="sm" onClick={handleSave}>
-                <Save className="mr-2 h-4 w-4" />
-                Guardar
+              <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Guardar
+                  </>
+                )}
               </Button>
             </div>
           </header>

@@ -58,7 +58,7 @@ export class EmailService {
   async sendWelcomeEmail(to: string, userName: string): Promise<boolean> {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">¡Bienvenido a AutomateSMB!</h1>
+        <h1 style="color: #333;">¡Bienvenido a AutomatePyme!</h1>
         <p>Hola ${userName},</p>
         <p>Gracias por registrarte en nuestra plataforma de automatización low-code.</p>
         <p>Ya puedes comenzar a crear tus soluciones personalizadas:</p>
@@ -69,15 +69,15 @@ export class EmailService {
           <li>Desarrolla soluciones completas</li>
         </ul>
         <p>¡Esperamos que disfrutes de la experiencia!</p>
-        <p>Saludos,<br>El equipo de AutomateSMB</p>
+        <p>Saludos,<br>El equipo de AutomatePyme</p>
       </div>
     `
 
     return this.sendEmail({
       to,
-      subject: "¡Bienvenido a AutomateSMB!",
+      subject: "¡Bienvenido a AutomatePyme!",
       html,
-      text: `¡Bienvenido a AutomateSMB, ${userName}! Gracias por registrarte en nuestra plataforma.`,
+      text: `¡Bienvenido a AutomatePyme, ${userName}! Gracias por registrarte en nuestra plataforma.`,
     })
   }
 
@@ -87,20 +87,20 @@ export class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #333;">Restablecer Contraseña</h1>
-        <p>Has solicitado restablecer tu contraseña en AutomateSMB.</p>
+        <p>Has solicitado restablecer tu contraseña en AutomatePyme.</p>
         <p>Haz clic en el siguiente enlace para crear una nueva contraseña:</p>
         <a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
           Restablecer Contraseña
         </a>
         <p>Este enlace expirará en 1 hora.</p>
         <p>Si no solicitaste este cambio, puedes ignorar este email.</p>
-        <p>Saludos,<br>El equipo de AutomateSMB</p>
+        <p>Saludos,<br>El equipo de AutomatePyme</p>
       </div>
     `
 
     return this.sendEmail({
       to,
-      subject: "Restablecer Contraseña - AutomateSMB",
+      subject: "Restablecer Contraseña - AutomatePyme",
       html,
       text: `Restablecer contraseña: ${resetUrl}`,
     })
@@ -127,7 +127,7 @@ export class EmailService {
           ${dataRows}
         </table>
         <p>Fecha: ${new Date().toLocaleString("es-ES")}</p>
-        <p>Saludos,<br>AutomateSMB</p>
+        <p>Saludos,<br>AutomatePyme</p>
       </div>
     `
 
@@ -154,7 +154,7 @@ export class EmailService {
         <p>El workflow <strong>${workflowName}</strong> se ha <span style="color: ${statusColor};">${statusText}</span>.</p>
         ${details ? `<p><strong>Detalles:</strong> ${details}</p>` : ""}
         <p>Fecha: ${new Date().toLocaleString("es-ES")}</p>
-        <p>Saludos,<br>AutomateSMB</p>
+        <p>Saludos,<br>AutomatePyme</p>
       </div>
     `
 

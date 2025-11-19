@@ -8,7 +8,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen">
       <header className="px-4 lg:px-6 h-14 flex items-center border-b">
         <Link className="flex items-center justify-center" href="#">
-          <span className="font-bold text-xl">AutomateSMB</span>
+          <span className="font-bold text-xl">AutomatePyme</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link className="text-sm font-medium hover:underline underline-offset-4" href="#">
@@ -57,7 +57,7 @@ export default function Home() {
                 <img
                   alt="Dashboard Preview"
                   className="aspect-video overflow-hidden rounded-xl object-cover object-center"
-                  src="/placeholder.svg?height=550&width=800"
+                  src="/20251119_1518_Engranaje y Símbolos Tecnológicos_remix_01kaenbrzke6798nr2v0tq7d8p.png"
                 />
               </div>
             </div>
@@ -172,7 +172,7 @@ export default function Home() {
                   <p className="text-muted-foreground">Perfecto para equipos pequeños que están comenzando.</p>
                 </div>
                 <div className="mt-4 flex items-baseline text-3xl font-bold">
-                  $29<span className="ml-1 text-base font-medium text-muted-foreground">/month</span>
+                  $29<span className="ml-1 text-base font-medium text-muted-foreground">/mes</span>
                 </div>
                 <ul className="mt-6 space-y-2">
                   <li className="flex items-center">
@@ -244,7 +244,7 @@ export default function Home() {
                     Automatización básica
                   </li>
                 </ul>
-                <Button className="mt-8">Comenzar</Button>
+                <Button className="mt-auto">Comenzar</Button>
               </div>
               <div className="flex flex-col rounded-lg border p-6 shadow-lg bg-primary text-primary-foreground">
                 <div className="space-y-2">
@@ -254,7 +254,7 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="mt-4 flex items-baseline text-3xl font-bold">
-                  $79<span className="ml-1 text-base font-medium text-primary-foreground/90">/month</span>
+                  $79<span className="ml-1 text-base font-medium text-primary-foreground/90">/mes</span>
                 </div>
                 <ul className="mt-6 space-y-2">
                   <li className="flex items-center">
@@ -343,7 +343,7 @@ export default function Home() {
                     Soporte prioritario
                   </li>
                 </ul>
-                <Button className="mt-8 bg-background text-primary hover:bg-background/90">Comenzar</Button>
+                <Button className="mt-auto bg-background text-primary hover:bg-background/90">Comenzar</Button>
               </div>
               <div className="flex flex-col rounded-lg border p-6">
                 <div className="space-y-2">
@@ -351,7 +351,7 @@ export default function Home() {
                   <p className="text-muted-foreground">Para organizaciones grandes con requisitos personalizados.</p>
                 </div>
                 <div className="mt-4 flex items-baseline text-3xl font-bold">
-                  $199<span className="ml-1 text-base font-medium text-muted-foreground">/month</span>
+                  $199<span className="ml-1 text-base font-medium text-muted-foreground">/mes</span>
                 </div>
                 <ul className="mt-6 space-y-2">
                   <li className="flex items-center">
@@ -457,14 +457,14 @@ export default function Home() {
                     Integraciones personalizadas
                   </li>
                 </ul>
-                <Button className="mt-8">Contactar Ventas</Button>
+                <Button className="mt-auto">Contactar Ventas</Button>
               </div>
             </div>
           </div>
         </section>
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full border-t px-4 md:px-6">
-        <p className="text-xs text-muted-foreground">© 2023 AutomateSMB. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">© 2025 AutomatePyme. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link className="text-xs hover:underline underline-offset-4" href="#">
             Términos de Servicio

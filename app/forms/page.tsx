@@ -52,7 +52,7 @@ export default function FormsPage() {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
         <Link className="flex items-center gap-2 font-semibold" href="/">
-          <span className="font-bold">AutomateSMB</span>
+          <span className="font-bold">AutomatePyme</span>
         </Link>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -145,7 +145,7 @@ export default function FormsPage() {
       </main>
 
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full border-t px-4 md:px-6">
-        <p className="text-xs text-muted-foreground">© 2023 AutomateSMB. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">© 2025 AutomatePyme. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link className="text-xs hover:underline underline-offset-4" href="#">
             Terms of Service

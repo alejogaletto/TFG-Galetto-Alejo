@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Database, Plus, Search, Package, Loader2, Home, FileText, Workflow, BarChart3, Settings } from "lucide-react"
+import { Database, Plus, Search, Package, Loader2, Home, FileText, Workflow, BarChart3, Settings, MoreHorizontal, Trash } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +12,23 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { NotificationIcon } from "@/components/notifications/notification-icon"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface VirtualSchema {
   id: number
@@ -47,6 +64,10 @@ export default function DatabasesPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [showSchemaPreview, setShowSchemaPreview] = useState(false)
   const [selectedDatabase, setSelectedDatabase] = useState<VirtualSchema | null>(null)
+  const [databaseToDelete, setDatabaseToDelete] = useState<VirtualSchema | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDatabases()
@@ -93,12 +114,40 @@ export default function DatabasesPage() {
     return matchesSearch
   })
 
+  const openDeleteDialog = (database: VirtualSchema) => {
+    setDatabaseToDelete(database)
+    setShowDeleteDialog(true)
+    setDeleteError(null)
+  }
+
+  const handleDeleteDatabase = async () => {
+    if (!databaseToDelete) return
+
+    try {
+      setIsDeleting(true)
+      setDeleteError(null)
+      const response = await fetch(`/api/virtual-schemas/${databaseToDelete.id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data?.error || 'No se pudo eliminar la base de datos')
+      }
+      setDatabases((prev) => prev.filter((db) => db.id !== databaseToDelete.id))
+      setShowDeleteDialog(false)
+      setDatabaseToDelete(null)
+    } catch (err) {
+      console.error('Error deleting database:', err)
+      setDeleteError(err instanceof Error ? err.message : 'Error eliminando base de datos')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen w-full flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
           <Link className="flex items-center gap-2 font-semibold" href="#">
-            <span className="font-bold">AutomateSMB</span>
+            <span className="font-bold">AutomatePyme</span>
           </Link>
           <nav className="hidden flex-1 items-center gap-6 md:flex">
             <Link className="text-sm font-medium" href="/dashboard">
@@ -186,7 +235,7 @@ export default function DatabasesPage() {
       <div className="flex min-h-screen w-full flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
           <Link className="flex items-center gap-2 font-semibold" href="#">
-            <span className="font-bold">AutomateSMB</span>
+            <span className="font-bold">AutomatePyme</span>
           </Link>
           <nav className="hidden flex-1 items-center gap-6 md:flex">
             <Link className="text-sm font-medium" href="/dashboard">
@@ -273,7 +322,7 @@ export default function DatabasesPage() {
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
         <Link className="flex items-center gap-2 font-semibold" href="#">
-          <span className="font-bold">AutomateSMB</span>
+          <span className="font-bold">AutomatePyme</span>
         </Link>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
@@ -403,11 +452,39 @@ export default function DatabasesPage() {
                     const dbType = getDatabaseType(db.configs)
                     return (
                       <Card key={db.id} className="flex flex-col">
-                        <CardHeader>
-                          <CardTitle>{db.name}</CardTitle>
-                          <CardDescription>
-                            {db.description || 'Sin descripción'}
-                          </CardDescription>
+                        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                          <div>
+                            <CardTitle>{db.name}</CardTitle>
+                            <CardDescription>
+                              {db.description || 'Sin descripción'}
+                            </CardDescription>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Abrir menú de base de datos</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedDatabase(db)
+                                setShowSchemaPreview(true)
+                              }}>
+                                Ver esquema
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/databases/${db.id}`}>
+                                  Abrir
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive flex items-center gap-2" onClick={() => openDeleteDialog(db)}>
+                                <Trash className="h-4 w-4" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </CardHeader>
                         <CardContent>
                           <div className="flex items-center gap-4">
@@ -531,6 +608,50 @@ export default function DatabasesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open)
+          if (!open) {
+            setDatabaseToDelete(null)
+            setDeleteError(null)
+            setIsDeleting(false)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar base de datos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente <span className="font-semibold">{databaseToDelete?.name || "esta base de datos"}</span> y todos sus datos asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowDeleteDialog(false)
+                setDatabaseToDelete(null)
+                setDeleteError(null)
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDatabase}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

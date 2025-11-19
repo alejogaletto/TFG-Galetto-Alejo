@@ -36,7 +36,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -408,7 +408,7 @@ export default function WorkflowsPage() {
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
         <Link className="flex items-center gap-2 font-semibold" href="#">
-          <span className="font-bold">AutomateSMB</span>
+          <span className="font-bold">AutomatePyme</span>
         </Link>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
@@ -546,92 +546,81 @@ export default function WorkflowsPage() {
                   )}
                 </div>
               ) : (
-                <div className="grid gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredWorkflows.map((workflow) => (
                   <Card 
                     key={workflow.id} 
-                    className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => router.push(`/dashboard/workflows/${workflow.id}/edit`)}
+                    className="flex h-full flex-col overflow-hidden hover:shadow-md transition-shadow"
                   >
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-muted rounded-lg">{getTriggerIcon(workflow.steps[0]?.actionType || "form_submission")}</div>
-                          <div>
-                            <CardTitle className="text-lg">{workflow.name}</CardTitle>
-                            <CardDescription>{workflow.description}</CardDescription>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(workflow.isActive ? "active" : "paused")}>
-                            <div className="flex items-center gap-1">
-                              {getStatusIcon(workflow.isActive ? "active" : "paused")}
-                              <span className="capitalize">{workflow.isActive ? "active" : "paused"}</span>
-                            </div>
-                          </Badge>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/dashboard/workflows/${workflow.id}`)
-                              }}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Ver Detalles
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/dashboard/workflows/${workflow.id}/edit`)
-                              }}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation()
-                                toast({
-                                  title: "Próximamente",
-                                  description: "La función de duplicar estará disponible pronto"
-                                })
-                              }}>
-                                <Copy className="mr-2 h-4 w-4" />
-                                Duplicar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={(e) => handleToggleActive(e, workflow)}>
-                                {workflow.isActive ? (
-                                  <>
-                                    <Pause className="mr-2 h-4 w-4" />
-                                    Pausar
-                                  </>
-                                ) : (
-                                  <>
-                                    <Play className="mr-2 h-4 w-4" />
-                                    Activar
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="text-red-600"
-                                onClick={(e) => showDeleteConfirmation(e, workflow.id)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-muted rounded-lg">{getTriggerIcon(workflow.steps[0]?.actionType || "form_submission")}</div>
+                        <div>
+                          <CardTitle className="text-lg">{workflow.name}</CardTitle>
+                          <CardDescription>{workflow.description || "Sin descripción"}</CardDescription>
                         </div>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(workflow.isActive ? "active" : "paused")}>
+                          <div className="flex items-center gap-1">
+                            {getStatusIcon(workflow.isActive ? "active" : "paused")}
+                            <span className="capitalize">{workflow.isActive ? "active" : "paused"}</span>
+                          </div>
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/workflows/${workflow.id}`)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver Detalles
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/workflows/${workflow.id}/edit`)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              toast({
+                                title: "Próximamente",
+                                description: "La función de duplicar estará disponible pronto"
+                              })
+                            }}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              Duplicar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={(e) => handleToggleActive(e, workflow)}>
+                              {workflow.isActive ? (
+                                <>
+                                  <Pause className="mr-2 h-4 w-4" />
+                                  Pausar
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="mr-2 h-4 w-4" />
+                                  Activar
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={(e) => showDeleteConfirmation(e, workflow.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex-1">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
                           <div className="text-sm text-muted-foreground">Última Ejecución</div>
@@ -651,6 +640,18 @@ export default function WorkflowsPage() {
                         </div>
                       </div>
                     </CardContent>
+                    <CardFooter className="flex justify-between mt-auto">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dashboard/workflows/${workflow.id}`}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver Workflow
+                        </Link>
+                      </Button>
+                      <Button size="sm" onClick={() => router.push(`/dashboard/workflows/${workflow.id}/edit`)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar
+                      </Button>
+                    </CardFooter>
                   </Card>
                   ))}
                 </div>

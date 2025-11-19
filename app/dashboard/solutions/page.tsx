@@ -53,6 +53,16 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NotificationIcon } from "@/components/notifications/notification-icon"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function SolutionsPage() {
   const router = useRouter()
@@ -64,6 +74,10 @@ export default function SolutionsPage() {
   const [existingSolutions, setExistingSolutions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<number | null>(null)
+  const [solutionToDelete, setSolutionToDelete] = useState<any | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Icon mapping helper
   const getIconComponent = (iconName: string, size = "h-8 w-8") => {
@@ -195,12 +209,40 @@ export default function SolutionsPage() {
     solution.name.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
+  const openDeleteDialog = (solution: any) => {
+    setSolutionToDelete(solution)
+    setShowDeleteDialog(true)
+    setDeleteError(null)
+  }
+
+  const handleDeleteSolution = async () => {
+    if (!solutionToDelete) return
+
+    try {
+      setIsDeleting(true)
+      setDeleteError(null)
+      const response = await fetch(`/api/solutions/${solutionToDelete.id}`, { method: "DELETE" })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data?.error || "No se pudo eliminar la solución")
+      }
+      setExistingSolutions((prev) => prev.filter((sol) => sol.id !== solutionToDelete.id))
+      setShowDeleteDialog(false)
+      setSolutionToDelete(null)
+    } catch (error) {
+      console.error("Error deleting solution:", error)
+      setDeleteError(error instanceof Error ? error.message : "Error eliminando la solución")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       {/* Header Principal */}
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
         <Link className="flex items-center gap-2 font-semibold" href="#">
-          <span className="font-bold">AutomateSMB</span>
+          <span className="font-bold">AutomatePyme</span>
         </Link>
         <nav className="hidden flex-1 items-center gap-6 md:flex">
           <Link className="text-sm font-medium" href="/dashboard">
@@ -548,7 +590,10 @@ export default function SolutionsPage() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               className="text-red-600"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openDeleteDialog(solution)
+                              }}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Eliminar
@@ -578,6 +623,51 @@ export default function SolutionsPage() {
           </div>
         </main>
       </div>
+
+      <AlertDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open)
+          if (!open) {
+            setSolutionToDelete(null)
+            setDeleteError(null)
+            setIsDeleting(false)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar solución?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente{" "}
+              <span className="font-semibold">{solutionToDelete?.name || "esta solución"}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowDeleteDialog(false)
+                setSolutionToDelete(null)
+                setDeleteError(null)
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSolution}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

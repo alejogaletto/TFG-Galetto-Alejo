@@ -3,8 +3,8 @@ import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Automate Pyme',
+  description: 'Automatiza los Procesos de tu Negocio Sin Código',
   generator: 'v0.dev',
 }
 

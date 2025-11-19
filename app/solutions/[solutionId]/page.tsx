@@ -282,7 +282,39 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
   const [newRowData, setNewRowData] = useState<any>({})
 
   const columnConfigs: ColumnConfiguration[] = config.columnConfigs || []
+  // Filter columns: include columns that don't have visible=false
+  // This includes columns with visible=true and columns without a visible property
   const visibleColumns = columnConfigs.filter(col => col.visible !== false)
+  
+  // Fallback: if no columnConfigs are provided, create columns from fetched fields
+  const fallbackColumns =
+    fields.map((field: any) => ({
+      field: field.name,
+      label: field.properties?.label || field.name,
+      type: field.type || 'text',
+      editable: false,
+      visible: true,
+      options: field.properties?.options || [],
+    }))
+  
+  // Use fallback columns only if no visible columns are configured
+  const usingFallbackColumns = visibleColumns.length === 0 && fallbackColumns.length > 0
+  const displayColumns = usingFallbackColumns ? fallbackColumns : visibleColumns
+  
+  const visibleColumnFields = visibleColumns.map(col => col.field).join(',')
+
+  useEffect(() => {
+    console.group(`[DataTableComponent] ${config.title || 'Table'}`)
+    console.log('tableId:', config.tableId)
+    console.log('columnConfigs:', columnConfigs)
+    console.log('visibleColumns:', visibleColumns)
+    console.log('fields:', fields)
+    console.log('fallbackColumns:', fallbackColumns)
+    console.log('usingFallbackColumns:', usingFallbackColumns)
+    console.log('displayColumns:', displayColumns)
+    console.log('displayColumns.length:', displayColumns.length)
+    console.groupEnd()
+  }, [config.title, config.tableId, columnConfigs, visibleColumns, fields, fallbackColumns, usingFallbackColumns, displayColumns])
 
   useEffect(() => {
     fetchData()
@@ -300,6 +332,10 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
       if (response.ok) {
         const records = await response.json()
         setData(records)
+        console.info('[DataTableComponent] Data fetched', {
+          tableId: config.tableId,
+          count: records.length,
+        })
       }
     } catch (error) {
       console.error('Error fetching table data:', error)
@@ -474,6 +510,23 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
     )
   }
 
+  // Show a message if no columns are configured
+  if (displayColumns.length === 0) {
+    return (
+      <Card className="h-full flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm">{config.title || "Tabla de Datos"}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center text-muted-foreground">
+            <p className="mb-2">⚠️ No hay columnas configuradas</p>
+            <p className="text-xs">Esperando configuración de columnas...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <>
       <Card className="h-full flex flex-col">
@@ -491,7 +544,7 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  {visibleColumns.map((col) => (
+                  {displayColumns.map((col) => (
                     <TableHead key={col.field}>{col.label}</TableHead>
                   ))}
                   {(config.allowEdit !== false || config.allowDelete !== false) && (
@@ -502,14 +555,14 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
               <TableBody>
                 {data.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={visibleColumns.length + 1} className="text-center text-muted-foreground">
+                    <TableCell colSpan={displayColumns.length + 1} className="text-center text-muted-foreground">
                       No hay datos disponibles
                     </TableCell>
                   </TableRow>
                 ) : (
                   data.map((row) => (
                     <TableRow key={row.id}>
-                      {visibleColumns.map((col) => (
+                      {displayColumns.map((col) => (
                         <TableCell key={col.field}>
                           {renderCell(row, col)}
                         </TableCell>
@@ -558,7 +611,7 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
             <DialogDescription>Completa los campos para crear un nuevo registro</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            {visibleColumns.map((col) => (
+            {displayColumns.map((col) => (
               <div key={col.field}>
                 <Label>{col.label}</Label>
                 {col.type === 'dropdown' && col.options ? (
@@ -570,7 +623,7 @@ function DataTableComponent({ config, userId }: { config: any; userId: number | 
                       <SelectValue placeholder="Seleccionar..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {col.options.map((opt) => (
+                      {col.options.map((opt: DropdownOption) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.label}
                         </SelectItem>

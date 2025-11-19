@@ -36,6 +36,16 @@ import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface VirtualFieldSchema {
   id: number
@@ -111,6 +121,9 @@ export default function DatabasePage() {
   const [showDataDialog, setShowDataDialog] = useState(false)
   const [editingRecord, setEditingRecord] = useState<any>(null)
   const [recordFormData, setRecordFormData] = useState<Record<string, any>>({})
+  const [showDeleteDatabaseDialog, setShowDeleteDatabaseDialog] = useState(false)
+  const [isDeletingDatabase, setIsDeletingDatabase] = useState(false)
+  const [deleteDatabaseError, setDeleteDatabaseError] = useState<string | null>(null)
 
   useEffect(() => {
     if (params.id) {
@@ -534,12 +547,15 @@ export default function DatabasePage() {
     if (!database) return
     
     try {
+      setIsDeletingDatabase(true)
+      setDeleteDatabaseError(null)
       const response = await fetch(`/api/virtual-schemas/${database.id}`, {
         method: 'DELETE'
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete database')
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data?.error || 'Failed to delete database')
       }
 
       toast({
@@ -547,14 +563,19 @@ export default function DatabasePage() {
         description: `La base de datos "${database.name}" ha sido eliminada exitosamente`,
       })
       
+      setShowDeleteDatabaseDialog(false)
       // Redirect to databases list
       router.push('/dashboard/databases')
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo eliminar la base de datos'
+      setDeleteDatabaseError(message)
       toast({
         title: "Error",
-        description: "No se pudo eliminar la base de datos",
+        description: message,
         variant: "destructive",
       })
+    } finally {
+      setIsDeletingDatabase(false)
     }
   }
 
@@ -904,9 +925,8 @@ export default function DatabasePage() {
                     variant="destructive" 
                     size="sm"
                     onClick={() => {
-                      if (confirm(`¿Estás seguro de que quieres eliminar la base de datos "${database.name}"? Esta acción no se puede deshacer.`)) {
-                        deleteDatabase()
-                      }
+                      setDeleteDatabaseError(null)
+                      setShowDeleteDatabaseDialog(true)
                     }}
                   >
                     <Trash className="h-4 w-4 mr-2" />
@@ -1669,6 +1689,47 @@ export default function DatabasePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={showDeleteDatabaseDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDatabaseDialog(open)
+          if (!open) {
+            setDeleteDatabaseError(null)
+            setIsDeletingDatabase(false)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar base de datos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente{" "}
+              <span className="font-semibold">{database?.name || "esta base de datos"}</span> y todos sus datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteDatabaseError && (
+            <p className="text-sm text-destructive">{deleteDatabaseError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowDeleteDatabaseDialog(false)
+                setDeleteDatabaseError(null)
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteDatabase}
+              disabled={isDeletingDatabase}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingDatabase ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

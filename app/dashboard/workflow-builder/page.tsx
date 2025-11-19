@@ -342,10 +342,10 @@ export default function WorkflowBuilderPage() {
                   <SelectValue placeholder="Select frequency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hourly">Hourly</SelectItem>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="hourly">Cada hora</SelectItem>
+                  <SelectItem value="daily">Diario</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="monthly">Mensual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
