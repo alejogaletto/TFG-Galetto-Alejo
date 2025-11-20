@@ -185,9 +185,6 @@ export default function LoginPage() {
             <Button className="w-full" variant="outline" onClick={handleGoogleLogin} disabled={isLoading} type="button">
               Continuar con Google
             </Button>
-            <Button className="w-full" variant="outline" onClick={handleAppleLogin} disabled={isLoading} type="button">
-              Continuar con Apple
-            </Button>
             <div className="text-center text-sm">
               ¿No tienes una cuenta?{" "}
               <Link className="underline" href="/signup">

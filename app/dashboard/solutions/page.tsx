@@ -125,6 +125,7 @@ export default function SolutionsPage() {
             solutionsData.map((s: any) => ({
               ...s,
               icon: getIconComponent(s.icon, "h-5 w-5"),
+              color: s.color || "bg-blue-500", // Default color if missing
               lastModified: s.modification_date || s.creation_date,
               type: s.template_type,
             }))

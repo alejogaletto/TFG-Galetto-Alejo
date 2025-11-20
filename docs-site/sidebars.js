@@ -35,6 +35,7 @@ module.exports = {
       items: [
         'api-endpoints',
         'form-submissions',
+        'demo-defense-guide',
       ],
     },
   ],

@@ -241,15 +241,6 @@ export default function SignupPage() {
             >
               Continuar con Google
             </Button>
-            <Button
-              className="w-full"
-              variant="outline"
-              onClick={handleAppleSignup}
-              disabled={isLoading}
-              type="button"
-            >
-              Continuar con Apple
-            </Button>
             <div className="text-center text-sm">
               ¿Ya tienes una cuenta?{" "}
               <Link className="underline" href="/login">

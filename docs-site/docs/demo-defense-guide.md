@@ -177,3 +177,47 @@ Las Soluciones son "paquetes" o "plantillas" que agrupan bases de datos, formula
 
 **P9: ¿La conexión entre Formularios y Base de Datos es en tiempo real?**
 *   **Respuesta**: Sí. Cuando se recibe el `POST` del formulario, el procesamiento es síncrono en la ruta de la API para asegurar que el usuario reciba confirmación de que sus datos se guardaron. Los efectos secundarios (emails, notificaciones) se pueden delegar al motor de workflows de forma asíncrona para no bloquear la respuesta UI.
+
+---
+
+## 7. Seguridad y Escalabilidad
+
+Esta sección aborda cómo la aplicación protege los datos y planea crecer.
+
+### 7.1 Estrategia de Seguridad
+*   **Autenticación**: Gestionada por **Supabase Auth**, utilizando JWTs (JSON Web Tokens) seguros y de corta duración. No almacenamos contraseñas en texto plano.
+*   **Autorización (La Defensa Principal)**: Utilizamos **Row Level Security (RLS)** de PostgreSQL.
+    *   *Cómo funciona*: Cada tabla tiene políticas como `CREATE POLICY "Users can only see their own data" ON "BusinessData" FOR SELECT USING (auth.uid() = user_id);`.
+    *   *Beneficio*: Es imposible que un bug en el frontend o en la API filtre datos de otros usuarios, porque la base de datos misma bloquea el acceso.
+*   **Validación de Entrada**: Todas las rutas de API utilizan esquemas de validación (Zod) para sanitizar los datos antes de procesarlos, previniendo inyecciones y datos corruptos.
+*   **Aislamiento de Datos**: Aunque usamos una arquitectura *multi-tenant* (todos los usuarios en las mismas tablas), el aislamiento lógico es estricto mediante la columna `user_id` obligatoria en todas las consultas.
+
+### 7.2 Estrategia de Escalabilidad
+*   **Escalado de Base de Datos**:
+    1.  **Vertical**: Aumentar recursos del servidor de BD (CPU/RAM) es el primer paso.
+    2.  **Horizontal (Lectura)**: Implementar Réplicas de Lectura para distribuir la carga de consultas `SELECT` pesadas (dashboards).
+    3.  **Particionamiento (Sharding)**: La tabla `BusinessData` es la candidata principal para crecer masivamente. Podemos particionarla físicamente por rangos de `virtual_table_schema_id` o `user_id`, manteniendo el rendimiento de índices alto.
+*   **Escalado de Backend**: Al usar **Next.js** en una arquitectura Serverless (o contenerizada), las funciones de API escalan automáticamente con el tráfico entrante, girando nuevas instancias según la demanda.
+*   **Optimización**:
+    *   **Caching**: Uso de React Query/SWR en el frontend para evitar peticiones repetitivas.
+    *   **Indexación**: Índices estratégicos en columnas JSONB de uso frecuente.
+
+---
+
+## 8. Hoja de Ruta Futura (Roadmap)
+
+Plan de evolución del producto para demostrar visión a largo plazo.
+
+### Corto Plazo (v1.1 - Próximo mes)
+*   **Corrección de Bugs y Pulido UI**: Mejorar la experiencia móvil y feedback visual.
+*   **Más Integraciones**: Plantillas pre-construidas para Slack y Stripe en los workflows.
+
+### Mediano Plazo (v2.0 - 6 meses)
+*   **Claves Foráneas Virtuales**: Permitir que un campo en una tabla virtual "apunte" a otra tabla virtual, con validación de integridad referencial real.
+*   **Colaboración en Tiempo Real**: Uso de WebSockets para que múltiples usuarios editen la misma base de datos simultáneamente (estilo Google Sheets).
+*   **Integración de IA**: "Texto a Workflow" (Generar automatizaciones describiéndolas en lenguaje natural) o "Texto a SQL" para reportes avanzados.
+
+### Largo Plazo (Enterprise - 1 año+)
+*   **Self-Hosting**: Empaquetar la solución en Docker para clientes que requieren instalación en servidores propios (On-Premise).
+*   **SSO (Single Sign-On)**: Integración con proveedores de identidad corporativos (Okta, Azure AD).
+*   **Logs de Auditoría Avanzados**: Historial inmutable de quién cambió qué y cuándo para cumplimiento normativo (compliance).
