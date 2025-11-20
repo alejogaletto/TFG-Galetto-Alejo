@@ -96,15 +96,7 @@ export default function DashboardPage() {
             <div className="flex items-center">
               <TabsList>
                 <TabsTrigger value="overview">Vista General</TabsTrigger>
-                <TabsTrigger value="analytics">Analíticas</TabsTrigger>
-                <TabsTrigger value="reports">Informes</TabsTrigger>
               </TabsList>
-              <div className="ml-auto flex gap-2">
-                <Button variant="outline" size="sm">
-                  Descargar
-                </Button>
-                <Button size="sm">Crear Nuevo</Button>
-              </div>
             </div>
             <TabsContent value="overview" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -172,21 +164,46 @@ export default function DashboardPage() {
                 </Card>
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4">
-                  <CardHeader>
-                    <CardTitle>Actividad Reciente</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pl-2">
-                    <img
-                      src="/placeholder.svg?height=300&width=600"
-                      width={600}
-                      height={300}
-                      alt="Gráfico de actividad"
-                      className="rounded-md object-cover"
-                    />
-                  </CardContent>
-                </Card>
                 <Card className="col-span-3">
+                  <CardHeader>
+                    <CardTitle>Bases de Datos Recientes</CardTitle>
+                    <CardDescription>Has creado 8 bases de datos este mes.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <Database className="h-5 w-5 text-primary" />
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium leading-none">Clientes CRM</p>
+                          <p className="text-sm text-muted-foreground">Creado hace 1 día</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Database className="h-5 w-5 text-primary" />
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium leading-none">Inventario de Productos</p>
+                          <p className="text-sm text-muted-foreground">Creado hace 3 días</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Database className="h-5 w-5 text-primary" />
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium leading-none">Registro de Empleados</p>
+                          <p className="text-sm text-muted-foreground">Creado hace 1 semana</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button size="sm" className="w-full" asChild>
+                      <Link href="/dashboard/databases">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Crear Nueva Base de Datos
+                      </Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+                <Card className="col-span-4">
                   <CardHeader>
                     <CardTitle>Formularios Recientes</CardTitle>
                     <CardDescription>Has creado 12 formularios este mes.</CardDescription>
@@ -226,34 +243,6 @@ export default function DashboardPage() {
                   </CardFooter>
                 </Card>
               </div>
-            </TabsContent>
-            <TabsContent value="analytics" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Resumen de Analíticas</CardTitle>
-                  <CardDescription>
-                    Ver analíticas detalladas sobre tus formularios, bases de datos y flujos de trabajo.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] flex items-center justify-center border rounded-md">
-                    <p className="text-muted-foreground">El panel de analíticas aparecerá aquí</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="reports" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informes Generados</CardTitle>
-                  <CardDescription>Ver y descargar informes generados a partir de tus datos.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] flex items-center justify-center border rounded-md">
-                    <p className="text-muted-foreground">Los informes aparecerán aquí</p>
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </main>

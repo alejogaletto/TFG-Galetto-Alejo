@@ -49,6 +49,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 export default function SolutionDetailPage() {
   const params = useParams()
@@ -516,6 +520,7 @@ export default function SolutionDetailPage() {
                             style: 'currency',
                             currency: 'USD',
                             minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
                           }).format(value)
                         } 
                         // Date formatting
@@ -755,7 +760,7 @@ export default function SolutionDetailPage() {
               },
               body: JSON.stringify({
                 form_id: component.config.formId,
-                data: componentFormData,
+                form_data: componentFormData,
               }),
             })
 
@@ -769,6 +774,8 @@ export default function SolutionDetailPage() {
                 ...formData,
                 [component.id]: {}
               })
+              // Refresh data
+              await fetchComponentsData(canvasComponents)
             } else {
               throw new Error('Error al enviar el formulario')
             }
@@ -784,7 +791,7 @@ export default function SolutionDetailPage() {
           }
         }
 
-        const handleFieldChange = (fieldName: string, value: string) => {
+        const handleFieldChange = (fieldName: string, value: any) => {
           setFormData({
             ...formData,
             [component.id]: {
@@ -792,6 +799,221 @@ export default function SolutionDetailPage() {
               [fieldName]: value
             }
           })
+        }
+
+        const renderFormField = (fld: any) => {
+          const id = fld.id
+          const cfg = fld.configs || {}
+          const value = componentFormData[id] ?? (fld.type === "checkbox" ? false : "")
+          const label = fld.label
+          
+          // Normalize type to handle different capitalizations and synonyms from builder
+          const rawType = String(fld.type || "").toLowerCase()
+          const typeMap: Record<string, string> = {
+            texto: "text",
+            text: "text",
+            input: "text",
+            email: "email",
+            correo: "email",
+            phone: "phone",
+            telefono: "phone",
+            "teléfono": "phone",
+            textarea: "textarea",
+            area: "textarea",
+            select: "select",
+            dropdown: "select",
+            checkbox: "checkbox",
+            "casilla de verificación": "checkbox",
+            radio: "radio",
+            "botón de radio": "radio",
+            date: "date",
+            fecha: "date",
+            switch: "switch",
+            number: "number",
+            numero: "number",
+            "número": "number",
+          }
+          const normalizedType = typeMap[rawType] || rawType
+      
+          switch (normalizedType) {
+            case "text":
+            case "email":
+            case "phone":
+            case "name":
+              return (
+                <div className="space-y-1" key={id}>
+                  <Label htmlFor={`field_${id}`} className="flex text-xs">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <Input
+                    id={`field_${id}`}
+                    type={normalizedType === "email" ? "email" : "text"}
+                    placeholder={cfg.placeholder || ''}
+                    value={value}
+                    onChange={(e) => handleFieldChange(id.toString(), e.target.value)}
+                    className="h-8"
+                  />
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            case "textarea":
+              return (
+                <div className="space-y-1" key={id}>
+                  <Label htmlFor={`field_${id}`} className="flex text-xs">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <Textarea
+                    id={`field_${id}`}
+                    placeholder={cfg.placeholder || ''}
+                    value={value}
+                    onChange={(e) => handleFieldChange(id.toString(), e.target.value)}
+                    rows={cfg.rows || 3}
+                    className="min-h-[60px] text-sm"
+                  />
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            case "select":
+              return (
+                <div className="space-y-1" key={id}>
+                  <Label htmlFor={`field_${id}`} className="flex text-xs">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <Select value={value?.toString()} onValueChange={(val) => handleFieldChange(id.toString(), val)}>
+                    <SelectTrigger id={`field_${id}`} className="h-8">
+                      <SelectValue placeholder={cfg.placeholder || "Seleccionar"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(cfg.options || []).map((opt: string, idx: number) => (
+                        <SelectItem key={idx} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            case "checkbox":
+              return (
+                <div className="space-y-1" key={id}>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`field_${id}`}
+                      checked={!!value}
+                      onCheckedChange={(checked) => handleFieldChange(id.toString(), checked)}
+                    />
+                    <Label htmlFor={`field_${id}`} className="flex text-xs">
+                      {label}
+                      {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                    </Label>
+                  </div>
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            case "radio":
+              return (
+                <div className="space-y-1" key={id}>
+                  <Label className="flex text-xs">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <RadioGroup value={value?.toString()} onValueChange={(val) => handleFieldChange(id.toString(), val)} className="space-y-1">
+                    {(cfg.options || []).map((opt: string, idx: number) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <RadioGroupItem value={opt} id={`field_${id}_option_${idx}`} />
+                        <Label htmlFor={`field_${id}_option_${idx}`} className="text-xs">{opt}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            case "date":
+              return (
+                <div className="space-y-1" key={id}>
+                  <Label htmlFor={`field_${id}`} className="flex text-xs">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <Input
+                    id={`field_${id}`}
+                    type="date"
+                    value={value}
+                    onChange={(e) => handleFieldChange(id.toString(), e.target.value)}
+                    className="h-8"
+                  />
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            case "switch":
+              return (
+                <div className="space-y-1" key={id}>
+                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/20">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id={`field_${id}`}
+                        checked={!!value}
+                        onCheckedChange={(checked) => handleFieldChange(id.toString(), checked)}
+                      />
+                      <div className="flex flex-col">
+                        <Label htmlFor={`field_${id}`} className="flex text-xs">
+                          {label}
+                          {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground mt-1">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            case "number":
+              return (
+                <div className="space-y-1" key={id}>
+                  <Label htmlFor={`field_${id}`} className="flex text-xs">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <Input
+                    id={`field_${id}`}
+                    type="number"
+                    placeholder={cfg.placeholder || ''}
+                    value={value}
+                    onChange={(e) => handleFieldChange(id.toString(), e.target.value)}
+                    className="h-8"
+                  />
+                  {cfg.helpText && <p className="text-[10px] text-muted-foreground">{cfg.helpText}</p>}
+                </div>
+              )
+      
+            default:
+              return (
+                <div className="space-y-1" key={id}>
+                  <Label htmlFor={`field_${id}`} className="flex text-xs">
+                    {label}
+                    {cfg.required && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  <Input 
+                    id={`field_${id}`}
+                    placeholder={cfg.placeholder || ''} 
+                    className="h-8"
+                    value={value}
+                    onChange={(e) => handleFieldChange(id.toString(), e.target.value)}
+                    required={cfg.required}
+                  />
+                </div>
+              )
+          }
         }
 
         return (
@@ -809,22 +1031,11 @@ export default function SolutionDetailPage() {
                 <form onSubmit={handleFormSubmit} className="space-y-3">
                   {selectedFormFields.length > 0 ? (
                     <>
-                      {selectedFormFields.map((field: any) => (
-                        <div key={field.id}>
-                          <Label className="text-xs">{field.label}</Label>
-                          <Input 
-                            placeholder={field.configs?.placeholder || ''} 
-                            className="h-8"
-                            value={componentFormData[field.field_name] || ''}
-                            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-                            required={field.configs?.required}
-                          />
-                        </div>
-                      ))}
+                      {selectedFormFields.map((field: any) => renderFormField(field))}
                       <Button 
                         type="submit" 
                         size="sm" 
-                        className="w-full h-8"
+                        className="w-full h-8 mt-2"
                         disabled={isSubmitting === component.id}
                       >
                         {isSubmitting === component.id ? "Enviando..." : (component.config.submitButtonText || "Enviar")}

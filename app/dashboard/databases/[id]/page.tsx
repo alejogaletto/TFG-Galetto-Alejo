@@ -881,21 +881,6 @@ export default function DatabasePage() {
               </div>
             </div>
           </div>
-
-          <div className="p-4 border-t">
-            <h3 className="font-medium mb-2 text-sm">Formularios Conectados</h3>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="w-full" disabled={true}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Conectar Nuevo Formulario (Próximamente)
-                </Button>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  Próximamente
-                </Badge>
-              </div>
-            </div>
-          </div>
         </aside>
         
         {/* Resize Handle */}
@@ -909,8 +894,8 @@ export default function DatabasePage() {
           <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-primary/10" />
         </div>
 
-        <main className="flex flex-1 flex-col">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+        <main className="flex flex-1 flex-col overflow-hidden">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
             <div className="border-b">
               <div className="flex items-center px-4 py-2">
                 <h1 className="text-lg font-medium">{database.name}</h1>
@@ -919,7 +904,6 @@ export default function DatabasePage() {
                     <TabsTrigger value="overview">Vista General</TabsTrigger>
                     <TabsTrigger value="structure">Estructura</TabsTrigger>
                     <TabsTrigger value="data">Datos</TabsTrigger>
-                    <TabsTrigger value="relations">Relaciones</TabsTrigger>
                   </TabsList>
                   <Button 
                     variant="destructive" 
@@ -943,7 +927,7 @@ export default function DatabasePage() {
                     <CardTitle>Vista General de la Base de Datos</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="text-center">
                         <div className="text-3xl font-bold text-primary">{database.tables?.length || 0}</div>
                         <div className="text-sm text-muted-foreground">Tablas</div>
@@ -953,12 +937,6 @@ export default function DatabasePage() {
                           {database.tables?.reduce((total, table) => total + (table.fields?.length || 0), 0) || 0}
                         </div>
                         <div className="text-sm text-muted-foreground">Campos Totales</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-primary">
-                          {database.configs?.created_via === 'database_builder' ? 'Sí' : 'No'}
-                        </div>
-                        <div className="text-sm text-muted-foreground">Creada con Constructor</div>
                       </div>
                     </div>
                     
@@ -1111,7 +1089,7 @@ export default function DatabasePage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="data" className="flex-1 p-4">
+            <TabsContent value="data" className="flex-1 p-4 overflow-auto">
               <div className="mx-auto max-w-full">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -1180,7 +1158,7 @@ export default function DatabasePage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto max-w-full">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -1249,23 +1227,6 @@ export default function DatabasePage() {
                         </Table>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="relations" className="flex-1 p-4">
-              <div className="mx-auto max-w-[900px]">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Relaciones de la Base de Datos</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Las relaciones entre tablas se mostrarán aquí</p>
-                      <p className="text-sm">cuando se implemente la funcionalidad de relaciones</p>
-                    </div>
                   </CardContent>
                 </Card>
               </div>

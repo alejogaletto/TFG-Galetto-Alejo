@@ -538,18 +538,19 @@ export default function FormsPage() {
 
                       <Separator className="my-2" />
 
-                      <div className="space-y-2">
-                        <Label>Integraciones Externas</Label>
+                      <div className="space-y-2 opacity-60 pointer-events-none select-none">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-muted-foreground">Integraciones Externas</Label>
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                            Próximamente
+                          </Badge>
+                        </div>
                         <p className="text-sm text-muted-foreground">Conecta tu formulario a servicios externos</p>
 
-                        <div className="flex items-center space-x-2 mt-4">
-                          <Checkbox
-                            id="google-sheets"
-                            checked={newForm.googleSheets}
-                            onCheckedChange={(checked) => setNewForm({ ...newForm, googleSheets: !!checked })}
-                          />
+                        <div className="flex items-center space-x-2 mt-4 blur-[1px]">
+                          <Checkbox id="google-sheets" checked={false} disabled />
                           <div className="grid gap-1.5 leading-none">
-                            <Label htmlFor="google-sheets" className="text-sm font-medium flex items-center">
+                            <Label htmlFor="google-sheets" className="text-sm font-medium flex items-center text-muted-foreground">
                               <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
                               Google Sheets
                             </Label>
@@ -559,69 +560,10 @@ export default function FormsPage() {
                           </div>
                         </div>
 
-                        {newForm.googleSheets && (
-                          <div className="grid gap-2 mt-3 p-3 border rounded-md">
-                            <div className="grid gap-1">
-                              <Label htmlFor="gs-spreadsheet">Spreadsheet ID</Label>
-                              <Input
-                                id="gs-spreadsheet"
-                                placeholder="1AbCDEFgh..."
-                                value={(newForm as any).googleSheetsSpreadsheetId || ""}
-                                onChange={(e) => setNewForm({ ...newForm, googleSheetsSpreadsheetId: e.target.value as any })}
-                              />
-                            </div>
-                            <div className="grid gap-1">
-                              <Label htmlFor="gs-sheet">Sheet name</Label>
-                              <Input
-                                id="gs-sheet"
-                                placeholder="Sheet1"
-                                value={(newForm as any).googleSheetsSheetName || ""}
-                                onChange={(e) => setNewForm({ ...newForm, googleSheetsSheetName: e.target.value as any })}
-                              />
-                            </div>
-                            <div>
-                              <Button
-                                variant="outline"
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch('/api/google/sheets/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newForm.name || 'Formulario' }) })
-                                    if (!res.ok) {
-                                      console.error('Failed to create sheet')
-                                      return
-                                    }
-                                    const data = await res.json()
-                                    setNewForm({
-                                      ...newForm,
-                                      googleSheetsSpreadsheetId: data.spreadsheetId,
-                                      googleSheetsSheetName: data.sheetName,
-                                    } as any)
-                                  } catch (e) {
-                                    console.error(e)
-                                  }
-                                }}
-                              >
-                                Crear hoja de Google
-                              </Button>
-                            </div>
-                            {!googleConnected && (
-                              <p className="text-xs text-muted-foreground">
-                                Puedes configurar tus credenciales en tu{" "}
-                                <Link href="/dashboard/profile?tab=google" className="underline">
-                                  perfil
-                                </Link>.
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="flex items-center space-x-2 mt-4">
-                          <Checkbox
-                            id="google-docs"
-                            checked={newForm.googleDocs}
-                            onCheckedChange={(checked) => setNewForm({ ...newForm, googleDocs: !!checked })}
-                          />
+                        <div className="flex items-center space-x-2 mt-4 blur-[1px]">
+                          <Checkbox id="google-docs" checked={false} disabled />
                           <div className="grid gap-1.5 leading-none">
-                            <Label htmlFor="google-docs" className="text-sm font-medium flex items-center">
+                            <Label htmlFor="google-docs" className="text-sm font-medium flex items-center text-muted-foreground">
                               <FileText2 className="h-4 w-4 mr-2 text-blue-600" />
                               Google Docs
                             </Label>
@@ -631,16 +573,12 @@ export default function FormsPage() {
                           </div>
                         </div>
 
-                        <div
-                          className="flex items-center space-x-2 mt-4 opacity-50 cursor-not-allowed"
-                          aria-disabled
-                          title="Próximamente"
-                        >
+                        <div className="flex items-center space-x-2 mt-4 blur-[1px]">
                           <Checkbox id="webhook" checked={false} disabled />
-                          <div className="grid gap-1.5 leading-none border border-dashed rounded p-2 bg-muted w-full">
+                          <div className="grid gap-1.5 leading-none">
                             <Label htmlFor="webhook" className="text-sm font-medium flex items-center text-muted-foreground">
                               <Webhook className="h-4 w-4 mr-2 text-purple-600" />
-                              Webhook (Próximamente)
+                              Webhook
                             </Label>
                             <p className="text-sm text-muted-foreground">Envía datos a endpoints personalizados</p>
                           </div>
@@ -681,49 +619,6 @@ export default function FormsPage() {
                               Personalizable
                             </Badge>
                           </div>
-                        </div>
-                      </div>
-
-                      <Separator className="my-2" />
-
-                      <div className="space-y-2">
-                        <Label>Opciones Adicionales</Label>
-
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Checkbox
-                            id="email-notifications"
-                            defaultChecked
-                            checked={newForm.enableNotifications}
-                            onCheckedChange={(checked) => setNewForm({ ...newForm, enableNotifications: !!checked })}
-                          />
-                          <Label htmlFor="email-notifications" className="text-sm flex items-center">
-                            <Mail className="h-4 w-4 mr-2 text-blue-600" />
-                            Habilitar notificaciones por email
-                          </Label>
-                        </div>
-
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Checkbox
-                            id="workflow-trigger"
-                            checked={newForm.enableWorkflow}
-                            onCheckedChange={(checked) => setNewForm({ ...newForm, enableWorkflow: !!checked })}
-                          />
-                          <Label htmlFor="workflow-trigger" className="text-sm flex items-center">
-                            <GitBranch className="h-4 w-4 mr-2 text-amber-600" />
-                            Activar flujo de trabajo al enviar
-                          </Label>
-                        </div>
-
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Checkbox
-                            id="captcha"
-                            defaultChecked
-                            checked={newForm.enableCaptcha}
-                            onCheckedChange={(checked) => setNewForm({ ...newForm, enableCaptcha: !!checked })}
-                          />
-                          <Label htmlFor="captcha" className="text-sm">
-                            Habilitar protección CAPTCHA
-                          </Label>
                         </div>
                       </div>
                     </div>

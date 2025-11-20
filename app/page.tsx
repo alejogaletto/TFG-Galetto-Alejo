@@ -57,7 +57,7 @@ export default function Home() {
                 <img
                   alt="Dashboard Preview"
                   className="aspect-video overflow-hidden rounded-xl object-cover object-center"
-                  src="/20251119_1518_Engranaje y Símbolos Tecnológicos_remix_01kaenbrzke6798nr2v0tq7d8p.png"
+                  src='/background.png'
                 />
               </div>
             </div>

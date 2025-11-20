@@ -376,48 +376,12 @@ export default function ProfilePage() {
 
           {/* Profile Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="security">Seguridad</TabsTrigger>
               <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
-              <TabsTrigger value="google">Google</TabsTrigger>
               <TabsTrigger value="account">Cuenta</TabsTrigger>
             </TabsList>
-            <TabsContent value="google" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Credenciales de Google</CardTitle>
-                  <CardDescription>Conecta tu cuenta de Google para usar Hojas de Cálculo.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Conecta con Google para conceder permisos a Hojas de Cálculo automáticamente.
-                    </p>
-                    <Button asChild disabled={googleConfig.connected}>
-                      <Link href={googleConfig.connected ? "#" : "/api/auth/google"}>
-                        {googleConfig.connected ? "Conectado" : "Conectar con Google"}
-                      </Link>
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Se solicitará el alcance necesario para crear y editar hojas de cálculo.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="google-connected"
-                      checked={googleConfig.connected}
-                      onCheckedChange={(checked) => setGoogleConfig((p) => ({ ...p, connected: !!checked }))}
-                    />
-                    <Label htmlFor="google-connected">Marcar como conectado</Label>
-                  </div>
-                  <Button onClick={updateProfile} disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar credenciales"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="general" className="space-y-4">
               <Card>
